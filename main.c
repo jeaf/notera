@@ -13,7 +13,8 @@
                                   printf("\n");               \
                                   return 0;}
 
-sqlite3* db = NULL;
+sqlite3* db        = NULL;
+sqlite3_stmt* stmt = 0;
 
 int utf8_to_md()
 {
@@ -35,7 +36,6 @@ int generate_sid(int64_t* oSid)
 {
     assert(oSid);
     *oSid = 0;
-    sqlite3_stmt* stmt = 0;
     int rc = sqlite3_prepare_v2(db, "select random()", -1, &stmt, 0);
     rc  = sqlite3_step(stmt);
     if (rc == SQLITE_ROW) *oSid = sqlite3_column_int64(stmt, 0);
@@ -54,16 +54,14 @@ int get_sid_cookie(int64_t* oSid)
 {
     assert(oSid);
     *oSid = 0;
-    const char* cookies = getenv("HTTP_COOKIE");
-    if (cookies)
+    const char* cookie = getenv("HTTP_COOKIE");
+    if (cookie)
     {
-        const char* sid_str = strstr(cookies, "sid=");
+        const char* sid_str = strstr(cookie, "sid=");
         if (sid_str)
         {
             sid_str += 4;
-            const char* semicol = strchr(sid_str, ';');
             sscanf(sid_str, "%lld", oSid);
-            //*oSid = strtoll(sid_str, NULL, 10);
         }
     }
     return 1;
@@ -77,23 +75,49 @@ int main()
     rc = sqlite3_exec(
          db,
          "CREATE TABLE IF NOT EXISTS session("
-         "    id            INTEGER PRIMARY KEY,"
+         "    sid           INTEGER PRIMARY KEY,"
          "    creation_time INTEGER NOT NULL DEFAULT (strftime('%s', 'now')));",
          0, 0, 0);
     CHECK(rc == SQLITE_OK, "Can't create tables: %d", rc)
 
     // Check SID
+    bool authenticated = false;
     int64_t sid;
+    int sid_age = INT_MAX;
     get_sid_cookie(&sid);
+    if (sid == 0)
+    {
+        // Generate new sid
+        //generate_sid(&sid);
+    }
+    else
+    {
+        // Look if the SID exists in the DB
+        char sql[1024];
+        sprintf(sql, "SELECT sid, (strftime('%%s', 'now') - creation_time) as age FROM session WHERE sid=%lld", sid);
+        rc = sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+        rc = sqlite3_step(stmt);
+        if (rc == SQLITE_ROW)
+        {
+            sid = sqlite3_column_int64(stmt, 0);
+            sid_age = sqlite3_column_int(stmt, 1);
+        }
+    }
 
-    //generate_sid(&sid);
-
-    // Output header
     printf("HTTP/1.0 200 OK\n");
     printf("Content-type: text/html\n");
-    printf("Set-Cookie: sid=%lld; Max-Age=10\n", sid);
-    printf("\n");
-    printf("Current sid: %lld\n", sid);
+
+    if (authenticated)
+    {
+    }
+    else
+    {
+        // Set the session ID cookie
+        printf("Set-Cookie: sid=%lld; Max-Age=60\n", sid);
+
+        // Send the login page
+        // todo
+    }
 
     return 0;
 }
