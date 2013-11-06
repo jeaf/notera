@@ -1,6 +1,7 @@
 #include "markdown.h"
 #include "html.h"
 #include "buffer.h"
+#include "sha1.h"
 #include "sqlite3.h"
 
 #include <assert.h>
@@ -28,7 +29,22 @@ void error(const char* msg, const char* file, const char* func, long line, ...)
     exit(0);
 }
 
-const char* login_page = "<html><head></head><body><form name=\"login_form\" action=\"http://localhost:8000/main.exe?login=1\" method=\"post\">            Username: <input type=\"text\"     name=\"usr\"><br/>            Password: <input type=\"password\" name=\"pwd\"><br/>            <input type=\"submit\" value=\"Login\" />        </form>    </body></html>";
+const char* pwd_salt = "1kmalspdlf09sDFSDF";
+
+void add_user(const char* username, const char* pwd)
+{
+    SHA1Context sha1_con;
+    SHA1Reset(&sha1_con);
+    SHA1Input(&sha1_con, pwd, strlen(pwd));
+    SHA1Input(&sha1_con, pwd_salt, strlen(pwd_salt));
+    SHA1Result(&sha1_con);
+
+    char sql_buf[1024] = {0};
+    sprintf(sql_buf, "INSERT INTO user(name, pwd_hash) VALUES ('%s', '%02x%02x%02x%02x%02x');", username,
+        sha1_con.Message_Digest[0], sha1_con.Message_Digest[1], sha1_con.Message_Digest[2], sha1_con.Message_Digest[3], sha1_con.Message_Digest[4]);
+    int rc = sqlite3_exec(db, sql_buf, NULL, NULL, NULL);
+    CHECK(rc == SQLITE_OK, "Can't insert user: %s", sqlite3_errmsg(db))
+}
 
 int utf8_to_md()
 {
@@ -115,6 +131,10 @@ int main()
          0, 0, 0);
     CHECK(rc == SQLITE_OK, "Can't create tables: %d", rc)
 
+    // Create a user
+    //add_user("abc", "def");
+    //return 0;
+
     // Assume initially that the user is not authenticated
     bool authenticated = false;
 
@@ -176,51 +196,17 @@ int main()
         printf("\n");
 
         // Content
-        printf("%s\n", login_page);
+        FILE* login_page = fopen("login.html", "r");
+        char buf[2048] = {0};
+        long len = fread(buf, 1, sizeof(buf) - 1, login_page);
+        while (len > 0)
+        {
+            buf[len] = 0;
+            printf("%s", buf);
+            len = fread(buf, 1, sizeof(buf) - 1, login_page);
+        }
     }
 
     return 0;
 }
 
-// CGI variables
-// AUTH_PASSWORD
-// AUTH_TYPE
-// AUTH_USER
-// CERT_COOKIE
-// CERT_FLAGS
-// CERT_ISSUER
-// CERT_KEYSIZE
-// CERT_SECRETKEYSIZE
-// CERT_SERIALNUMBER
-// CERT_SERVER_ISSUER
-// CERT_SERVER_SUBJECT
-// CERT_SUBJECT
-// CF_TEMPLATE_PATH
-// CONTENT_LENGTH
-// CONTENT_TYPE
-// CONTEXT_PATH
-// GATEWAY_INTERFACE
-// HTTPS
-// HTTPS_KEYSIZE
-// HTTPS_SECRETKEYSIZE
-// HTTPS_SERVER_ISSUER
-// HTTPS_SERVER_SUBJECT
-// HTTP_ACCEPT
-// HTTP_ACCEPT_ENCODING
-// HTTP_ACCEPT_LANGUAGE
-// HTTP_CONNECTION
-// HTTP_COOKIE
-// HTTP_HOST
-// HTTP_REFERER
-// HTTP_USER_AGENT
-// QUERY_STRING
-// REMOTE_ADDR
-// REMOTE_HOST
-// REMOTE_USER
-// REQUEST_METHOD
-// SCRIPT_NAME
-// SERVER_NAME
-// SERVER_PORT
-// SERVER_PORT_SECURE
-// SERVER_PROTOCOL
-// SERVER_SOFTWARE
