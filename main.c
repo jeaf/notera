@@ -156,6 +156,32 @@ int main()
         char buf[1024] = {0};
         long read_len = fread(buf, 1, content_len, stdin);
         CHECK(read_len == content_len, "Invalid login request, could not read data (read: %d, CONTENT_LENGTH: %d)", read_len, content_len);
+
+        // Find user name
+        char user[1024] = {0};
+        char* user_it = user;
+        char* buf_it = strstr(buf, "usr");
+        if (buf_it)
+        {
+            buf_it += 4;
+            while (*buf_it && *buf_it != '&') *user_it++ = *buf_it++;
+        }
+
+        // Find password hash
+        char pwd_hash[1024] = {0};
+        char* pwd_hash_it = pwd_hash;
+        buf_it = strstr(buf, "pwd");
+        if (buf_it)
+        {
+            buf_it += 4;
+            while (*buf_it && *buf_it != '&') *pwd_hash_it++ = *buf_it++;
+        }
+
+        printf("HTTP/1.0 200 OK\n");
+        printf("Content-type: text/html\n");
+        printf("\n");
+        printf("<html><head></head><body><p>%s, %s</p></body></html>\n", user, pwd_hash);
+        return 0;
     }
 
     // Not a login request, check session

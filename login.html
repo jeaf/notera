@@ -1,11 +1,20 @@
 <html>
     <head>
+        <script src="http://crypto-js.googlecode.com/svn/tags/3.1.2/build/rollups/sha1.js"></script>
+        <script>
+            function submit_login()
+            {
+                frm = document.login_form
+                frm.pwd.value = CryptoJS.SHA1(frm.pwd.value + "1kmalspdlf09sDFSDF")
+                frm.submit()
+            }
+        </script>
     </head>
     <body>
         <form name="login_form" action="main.exe?login=1" method="post">
             Username: <input type="text"     name="usr"><br/>
             Password: <input type="password" name="pwd"><br/>
-            <input type="submit" value="Login" />
+            <input type="submit" value="Login" onClick="submit_login()" />
         </form>
     </body>
 </html>
