@@ -46,22 +46,6 @@ void add_user(const char* username, const char* pwd)
     CHECK(rc == SQLITE_OK, "Can't insert user: %s", sqlite3_errmsg(db))
 }
 
-int utf8_to_md()
-{
-    char* test_md = "abc\n===\n\n* a\n* b\n";
-    
-    struct sd_callbacks callbacks;
-    struct html_renderopt options;
-    sdhtml_renderer(&callbacks, &options, 0);
-    struct sd_markdown* md = sd_markdown_new(0, 16, &callbacks, &options);
-    struct buf* ob = bufnew(64);
-    sd_markdown_render(ob, test_md, strlen(test_md), md);
-
-    printf("%s\n", ob->data);
-
-    return 1;
-}
-
 int generate_sid(int64_t* oSid)
 {
     assert(oSid);
