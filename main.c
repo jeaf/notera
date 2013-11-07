@@ -183,11 +183,16 @@ int main()
         SHA1Reset(&sha1_con);
         SHA1Input(&sha1_con, user, strlen(user));
         char sql[1024];
-        sprintf(sql, "SELECT pwd_hash FROM user WHERE name='%s'", user);
+        sprintf(sql, "SELECT id,pwd_hash FROM user WHERE name='%s'", user);
         rc = sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
         rc = sqlite3_step(stmt);
         char hash_pwd[1024] = {0};
-        if (rc == SQLITE_ROW) strcpy(hash_pwd, sqlite3_column_text(stmt, 0));
+        long long user_id = -1;
+        if (rc == SQLITE_ROW)
+        {
+            user_id = sqlite3_column_int64(stmt, 0);
+            strcpy(hash_pwd, sqlite3_column_text(stmt, 1));
+        }
         SHA1Input(&sha1_con, hash_pwd, strlen(hash_pwd));
         char sid_str[1024] = {0};
         sprintf(sid_str, "%lld", sid);
@@ -200,10 +205,15 @@ int main()
         // Compare the expected auth token to the submitted one
         if (strcmp(expected_auth_token, auth_token) == 0)
         {
+            // User is authenticated, store the session
+            char sql[1024];
+            sprintf(sql, "INSERT INTO session(id, user_id) VALUES(%lld, %lld)", sid, user_id);
+            int rc = sqlite3_exec(db, sql, NULL, NULL, NULL);
             printf("HTTP/1.0 200 OK\n");
             printf("Content-type: text/html\n");
             printf("\n");
             printf("<html><head></head><body><p>Login successful!</p></body></html>\n");
+            authenticated = true;
         }
         else
         {
@@ -223,8 +233,9 @@ int main()
         // Get the age of the session from the DB
         int sid_age = INT_MAX;
         char sql[1024];
-        sprintf(sql, "SELECT (strftime('%%s', 'now') - creation_time) as age FROM session WHERE sid=%lld", sid);
+        sprintf(sql, "SELECT (strftime('%%s', 'now') - create_time) as age FROM session WHERE id=%lld", sid);
         rc = sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+        CHECK(rc == SQLITE_OK, "Session ID retrieval failed: %d", rc);
         rc = sqlite3_step(stmt);
         if (rc == SQLITE_ROW)
         {
@@ -243,7 +254,7 @@ int main()
         printf("\n");
 
         // Content
-        printf("<html><head></head><body><p>logged in! show app</p></body></html>\n");
+        printf("<html><head></head><body><p>show app</p></body></html>\n");
     }
     else
     {
@@ -251,7 +262,7 @@ int main()
         printf("HTTP/1.0 200 OK\n");
         printf("Content-type: text/html\n");
         generate_sid(&sid);
-        printf("Set-Cookie: sid=%lld; Max-Age=60\n", sid);
+        printf("Set-Cookie: sid=%lld; Max-Age=%d\n", sid, 7 * 24 * 3600);
         printf("\n");
 
         // Content
