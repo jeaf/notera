@@ -1,12 +1,10 @@
-#include "markdown.h"
-#include "html.h"
-#include "buffer.h"
 #include "sha1.h"
 #include "sqlite3.h"
 
 #include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define CHECK(cond, msg, ...) if (!(cond)) error(msg, __FILE__, __FUNCTION__, __LINE__, ##__VA_ARGS__);
