@@ -160,27 +160,60 @@ int main()
         // Find user name
         char user[1024] = {0};
         char* user_it = user;
-        char* buf_it = strstr(buf, "usr");
+        char* buf_it = strstr(buf, "username");
         if (buf_it)
         {
-            buf_it += 4;
+            buf_it += strlen("username") + 1;
             while (*buf_it && *buf_it != '&') *user_it++ = *buf_it++;
         }
 
-        // Find password hash
-        char pwd_hash[1024] = {0};
-        char* pwd_hash_it = pwd_hash;
-        buf_it = strstr(buf, "pwd");
+        // Find submitted auth token (hash of username, hashed_pwd, sid)
+        char auth_token[1024] = {0};
+        char* auth_token_it = auth_token;
+        buf_it = strstr(buf, "auth_token");
         if (buf_it)
         {
-            buf_it += 4;
-            while (*buf_it && *buf_it != '&') *pwd_hash_it++ = *buf_it++;
+            buf_it += strlen("auth_token") + 1;
+            while (*buf_it && *buf_it != '&') *auth_token_it++ = *buf_it++;
         }
 
-        printf("HTTP/1.0 200 OK\n");
-        printf("Content-type: text/html\n");
-        printf("\n");
-        printf("<html><head></head><body><p>%s, %s</p></body></html>\n", user, pwd_hash);
+        // Construct the expected auth token
+        char exp_token[1024];
+        SHA1Context sha1_con;
+        SHA1Reset(&sha1_con);
+        SHA1Input(&sha1_con, user, strlen(user));
+        char sql[1024];
+        sprintf(sql, "SELECT pwd_hash FROM user WHERE name='%s'", user);
+        rc = sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+        rc = sqlite3_step(stmt);
+        char hash_pwd[1024] = {0};
+        if (rc == SQLITE_ROW) strcpy(hash_pwd, sqlite3_column_text(stmt, 0));
+        SHA1Input(&sha1_con, hash_pwd, strlen(hash_pwd));
+        char sid_str[1024] = {0};
+        sprintf(sid_str, "%lld", sid);
+        SHA1Input(&sha1_con, sid_str, strlen(sid_str));
+        SHA1Result(&sha1_con);
+        unsigned int* s = sha1_con.Message_Digest;
+        char expected_auth_token[1024] = {0};
+        sprintf(expected_auth_token, "%02x%02x%02x%02x%02x", s[0], s[1], s[2], s[3], s[4]);
+
+        // Compare the expected auth token to the submitted one
+        if (strcmp(expected_auth_token, auth_token) == 0)
+        {
+            printf("HTTP/1.0 200 OK\n");
+            printf("Content-type: text/html\n");
+            printf("\n");
+            printf("<html><head></head><body><p>Login successful!</p></body></html>\n");
+        }
+        else
+        {
+            printf("HTTP/1.0 200 OK\n");
+            printf("Content-type: text/html\n");
+            printf("\n");
+            printf("<html><head></head><body><p>Login FAIL, user: %s, pwd_hash: %s, tok: %s, sid: %s</p></body></html>\n",
+                   user, hash_pwd, sid_str, auth_token);
+        }
+
         return 0;
     }
 
