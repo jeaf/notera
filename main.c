@@ -236,7 +236,15 @@ int main()
         printf("\n");
 
         // Content
-        printf("<html><head></head><body><p>show app</p></body></html>\n");
+        FILE* login_page = fopen("app.html", "r");
+        char buf[2048] = {0};
+        long len = fread(buf, 1, sizeof(buf) - 1, login_page);
+        while (len > 0)
+        {
+            buf[len] = 0;
+            printf("%s", buf);
+            len = fread(buf, 1, sizeof(buf) - 1, login_page);
+        }
     }
     else
     {
