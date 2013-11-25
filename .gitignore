@@ -3,4 +3,5 @@
 *.exe
 *.cgi
 db.sqlite3
+*.dll
 

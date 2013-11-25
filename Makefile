@@ -11,7 +11,7 @@ CXXFLAGS      += $(SQLITE_FLAGS)
 $(EXEC): $(OBJS)
 	g++ $(CXXFLAGS) -o $@ $+
 
-main.o: main.cpp sqlite3.h
+main.o: main.cpp sha1.h sqlite3.h
 sha1.o: sha1.cpp sha1.h
 sqlite3.o: sqlite3.c sqlite3.h
 
