@@ -1,12 +1,15 @@
 #include "sha1.h"
 #include "sqlite3.h"
 
-#include <assert.h>
-#include <limits.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <climits>
+#include <cstdbool>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
+#include <iostream>
+
+using namespace std;
 
 #define CHECK(cond, msg, ...) if (!(cond)) error(msg, __FILE__, __FUNCTION__, __LINE__, ##__VA_ARGS__);
 
@@ -23,7 +26,7 @@ void error(const char* msg, const char* file, const char* func, long line, ...)
     printf("<html><head></head><body>");
     printf("<p>An error occurred while generating this page:</p>\n<p>");
     vprintf(msg, args);
-    printf("</p>\n<p>At: %s!%s:%d", file, func, line);
+    printf("</p>\n<p>At: %s!%s:%ld", file, func, line);
     printf("</p>\n</body></html>\n");
     exit(0);
 }
@@ -47,7 +50,6 @@ void add_user(const char* username, const char* pwd)
 
 int generate_sid(int64_t* oSid)
 {
-    assert(oSid);
     *oSid = 0;
     int rc = sqlite3_prepare_v2(db, "select random()", -1, &stmt, 0);
     rc  = sqlite3_step(stmt);
@@ -65,7 +67,6 @@ int generate_sid(int64_t* oSid)
 
 int get_sid_cookie(int64_t* oSid)
 {
-    assert(oSid);
     *oSid = 0;
     const char* cookie = getenv("HTTP_COOKIE");
     if (cookie)
