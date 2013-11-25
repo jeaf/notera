@@ -13,7 +13,30 @@ using namespace std;
 
 #define CHECK(cond, msg, ...) if (!(cond)) error(msg, __FILE__, __FUNCTION__, __LINE__, ##__VA_ARGS__);
 
-sqlite3* db        = NULL;
+class Sqlite
+{
+public:
+    Sqlite() : db(NULL) {}
+    int exec(const char* sql_buf, int (*callback)(void*,int,char**,char**), void* arg1, char** errmsg)
+    {
+        return sqlite3_exec(db, sql_buf, callback, arg1, errmsg);
+    }
+    int prepare_v2(const char *zSql, int nByte, sqlite3_stmt** ppStmt, const char **pzTail)
+    {
+        return sqlite3_prepare_v2(db, zSql, nByte, ppStmt, pzTail);
+    }
+    int open(const char *filename)
+    {
+        return sqlite3_open(filename, &db);
+    }
+    const char* errmsg()
+    {
+        return sqlite3_errmsg(db);
+    }
+    sqlite3* db;
+};
+
+Sqlite db;
 sqlite3_stmt* stmt = 0;
 
 void error(const char* msg, const char* file, const char* func, long line, ...)
@@ -44,14 +67,14 @@ void add_user(const char* username, const char* pwd)
     char sql_buf[1024] = {0};
     sprintf(sql_buf, "INSERT INTO user(name, pwd_hash) VALUES ('%s', '%02x%02x%02x%02x%02x');", username,
         sha.Message_Digest[0], sha.Message_Digest[1], sha.Message_Digest[2], sha.Message_Digest[3], sha.Message_Digest[4]);
-    int rc = sqlite3_exec(db, sql_buf, NULL, NULL, NULL);
-    CHECK(rc == SQLITE_OK, "Can't insert user: %s", sqlite3_errmsg(db))
+    int rc = db.exec(sql_buf, NULL, NULL, NULL);
+    CHECK(rc == SQLITE_OK, "Can't insert user: %s", db.errmsg())
 }
 
 int generate_sid(int64_t* oSid)
 {
     *oSid = 0;
-    int rc = sqlite3_prepare_v2(db, "select random()", -1, &stmt, 0);
+    int rc = db.prepare_v2("select random()", -1, &stmt, 0);
     rc  = sqlite3_step(stmt);
     if (rc == SQLITE_ROW) *oSid = sqlite3_column_int64(stmt, 0);
     else printf("error\n");
@@ -84,10 +107,9 @@ int get_sid_cookie(int64_t* oSid)
 int main()
 {
     // Connect to the DB and create tables
-    int rc = sqlite3_open("db.sqlite3", &db);
-    CHECK(!rc, "Can't open database: %s", sqlite3_errmsg(db))
-    rc = sqlite3_exec(
-         db,
+    int rc = db.open("db.sqlite3");
+    CHECK(!rc, "Can't open database: %s", db.errmsg())
+    rc = db.exec(
          "CREATE TABLE IF  NOT EXISTS note("
          "    id           INTEGER PRIMARY KEY,"
          "    title        TEXT,"
@@ -168,7 +190,7 @@ int main()
         sha.input(user, strlen(user));
         char sql[1024];
         sprintf(sql, "SELECT id,pwd_hash FROM user WHERE name='%s'", user);
-        rc = sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+        rc = db.prepare_v2(sql, -1, &stmt, 0);
         rc = sqlite3_step(stmt);
         char hash_pwd[1024] = {0};
         long long user_id = -1;
@@ -192,7 +214,7 @@ int main()
             // User is authenticated, store the session
             char sql[1024];
             sprintf(sql, "INSERT INTO session(id, user_id) VALUES(%lld, %lld)", sid, user_id);
-            int rc = sqlite3_exec(db, sql, NULL, NULL, NULL);
+            int rc = db.exec(sql, NULL, NULL, NULL);
             CHECK(rc == SQLITE_OK, "Can't insert session: %d", rc);
             printf("HTTP/1.0 200 OK\n");
             printf("Content-type: text/html\n");
@@ -219,7 +241,7 @@ int main()
         int sid_age = INT_MAX;
         char sql[1024];
         sprintf(sql, "SELECT (strftime('%%s', 'now') - create_time) as age FROM session WHERE id=%lld", sid);
-        rc = sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+        rc = db.prepare_v2(sql, -1, &stmt, 0);
         CHECK(rc == SQLITE_OK, "Session ID retrieval failed: %d", rc);
         rc = sqlite3_step(stmt);
         if (rc == SQLITE_ROW)
