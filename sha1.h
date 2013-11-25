@@ -27,14 +27,16 @@
 class Sha1
 {
 public:
+    Sha1() {reset();}
     void reset();
-    int  result();
     void input(const char*, unsigned);
-
-    void processMessageBlock();
-    void padMessage();
+    int  result();
 
     unsigned Message_Digest[5]; /* Message Digest (output)          */
+
+private:
+    void processMessageBlock();
+    void padMessage();
 
     unsigned Length_Low;        /* Message length in bits           */
     unsigned Length_High;       /* Message length in bits           */
