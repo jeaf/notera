@@ -67,8 +67,6 @@ public:
     char sql[1024];
 };
 
-Sqlite db;
-
 void error(const char* msg, const char* file, const char* func, long line, ...)
 {
     va_list args;
@@ -84,10 +82,9 @@ void error(const char* msg, const char* file, const char* func, long line, ...)
     exit(0);
 }
 
-const char* pwd_salt = "1kmalspdlf09sDFSDF";
-
-void add_user(const char* username, const char* pwd)
+void add_user(Sqlite& db, const char* username, const char* pwd)
 {
+    const char* pwd_salt = "1kmalspdlf09sDFSDF";
     Sha1 sha(pwd);
     sha.update(pwd_salt);
     sha.result();
@@ -98,7 +95,7 @@ void add_user(const char* username, const char* pwd)
     CHECK(rc == SQLITE_OK, "Can't insert user: %s", db.errmsg())
 }
 
-int generate_sid(int64_t* oSid)
+int generate_sid(Sqlite& db, int64_t* oSid)
 {
     *oSid = 0;
     shared_ptr<Sqlite::Stmt> stmt = db.prepare_v2("select random()", -1, 0);
@@ -134,6 +131,7 @@ int get_sid_cookie(int64_t* oSid)
 int main()
 {
     // Connect to the DB and create tables
+    Sqlite db;
     int rc = db.open("db.sqlite3");
     CHECK(!rc, "Can't open database: %s", db.errmsg())
     rc = db.exec(
@@ -165,7 +163,7 @@ int main()
     CHECK(rc == SQLITE_OK, "Can't create tables: %d", rc)
 
     // Create a user
-    //add_user("abc", "def");
+    //add_user(db, "abc", "def");
     //return 0;
 
     // Assume initially that the user is not authenticated
@@ -297,7 +295,7 @@ int main()
         // Header
         printf("HTTP/1.0 200 OK\n");
         printf("Content-type: text/html\n");
-        generate_sid(&sid);
+        generate_sid(db, &sid);
         printf("Set-Cookie: sid=%ld; Max-Age=%d\n", sid, 7 * 24 * 3600);
         printf("\n");
 
