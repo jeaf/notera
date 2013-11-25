@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <memory>
 #include <sstream>
 
 #define CHECK(cond, msg, ...) if (!(cond)) error(msg, __FILE__, __FUNCTION__, __LINE__, ##__VA_ARGS__);
@@ -28,14 +29,31 @@ Target lexical_cast(const Source& arg)
 class Sqlite
 {
 public:
-    Sqlite() : db(NULL), stmt(NULL) {}
+    class Stmt
+    {
+    public:
+        Stmt(sqlite3_stmt* stmt) : stmt_(stmt)
+        {
+        }
+        ~Stmt()
+        {
+            int rc = sqlite3_finalize(stmt_);
+            (void)rc;
+        }
+        sqlite3_stmt* stmt_;
+    };
+
+    Sqlite() : db(NULL) {}
     int exec(const char* sql_buf, int (*callback)(void*,int,char**,char**), void* arg1, char** errmsg)
     {
         return sqlite3_exec(db, sql_buf, callback, arg1, errmsg);
     }
-    int prepare_v2(const char *zSql, int nByte, sqlite3_stmt** ppStmt, const char **pzTail)
+    shared_ptr<Stmt> prepare_v2(const char *zSql, int nByte, const char **pzTail)
     {
-        return sqlite3_prepare_v2(db, zSql, nByte, ppStmt, pzTail);
+        sqlite3_stmt* stmt = NULL;
+        int rc = sqlite3_prepare_v2(db, zSql, nByte, &stmt, pzTail);
+        (void)rc;
+        return shared_ptr<Stmt>(new Stmt(stmt));
     }
     int open(const char *filename)
     {
@@ -46,7 +64,6 @@ public:
         return sqlite3_errmsg(db);
     }
     sqlite3* db;
-    sqlite3_stmt* stmt;
     char sql[1024];
 };
 
@@ -84,9 +101,9 @@ void add_user(const char* username, const char* pwd)
 int generate_sid(int64_t* oSid)
 {
     *oSid = 0;
-    int rc = db.prepare_v2("select random()", -1, &db.stmt, 0);
-    rc  = sqlite3_step(db.stmt);
-    if (rc == SQLITE_ROW) *oSid = sqlite3_column_int64(db.stmt, 0);
+    shared_ptr<Sqlite::Stmt> stmt = db.prepare_v2("select random()", -1, 0);
+    int rc = sqlite3_step(stmt->stmt_);
+    if (rc == SQLITE_ROW) *oSid = sqlite3_column_int64(stmt->stmt_, 0);
     else printf("error\n");
     if (*oSid < 0)
     {
@@ -197,14 +214,14 @@ int main()
         //char exp_token[1024];
         Sha1 sha(user);
         sprintf(db.sql, "SELECT id,pwd_hash FROM user WHERE name='%s'", user);
-        rc = db.prepare_v2(db.sql, -1, &db.stmt, 0);
-        rc = sqlite3_step(db.stmt);
+        shared_ptr<Sqlite::Stmt> stmt = db.prepare_v2(db.sql, -1, 0);
+        rc = sqlite3_step(stmt->stmt_);
         char hash_pwd[1024] = {0};
         long long user_id = -1;
         if (rc == SQLITE_ROW)
         {
-            user_id = sqlite3_column_int64(db.stmt, 0);
-            strcpy(hash_pwd, reinterpret_cast<const char*>(sqlite3_column_text(db.stmt, 1)));
+            user_id = sqlite3_column_int64(stmt->stmt_, 0);
+            strcpy(hash_pwd, reinterpret_cast<const char*>(sqlite3_column_text(stmt->stmt_, 1)));
         }
         sha.update(hash_pwd);
         string sid_str = lexical_cast<string>(sid);
@@ -245,12 +262,12 @@ int main()
         // Get the age of the session from the DB
         int sid_age = INT_MAX;
         sprintf(db.sql, "SELECT (strftime('%%s', 'now') - create_time) as age FROM session WHERE id=%ld", sid);
-        rc = db.prepare_v2(db.sql, -1, &db.stmt, 0);
+        shared_ptr<Sqlite::Stmt> stmt = db.prepare_v2(db.sql, -1, 0);
         CHECK(rc == SQLITE_OK, "Session ID retrieval failed: %d", rc);
-        rc = sqlite3_step(db.stmt);
+        rc = sqlite3_step(stmt->stmt_);
         if (rc == SQLITE_ROW)
         {
-            sid_age = sqlite3_column_int(db.stmt, 0);
+            sid_age = sqlite3_column_int(stmt->stmt_, 0);
         }
 
         // Check if the session is valid
