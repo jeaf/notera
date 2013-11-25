@@ -4,7 +4,7 @@ ifneq ($(findstring .exe, $(SHELL)), )
     EXEC   = main.exe
     RM     = rm.exe
 else
-    CFLAGS = -Wall -Werror -std=c99
+    CFLAGS = -Wall -std=c99
     EXEC   = main.cgi
     RM     = rm
 endif
