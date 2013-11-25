@@ -25,7 +25,7 @@
  *      written with the expectation that the processor has at least
  *      a 32-bit machine word size.  If the machine word size is larger,
  *      the code should still function properly.  One caveat to that
- *      is that the input functions taking characters and character
+ *      is that the update functions taking characters and character
  *      arrays assume that only 8 bits of information are stored in each
  *      character.
  *
@@ -43,6 +43,14 @@
 #define SHA1CircularShift(bits,word) \
                 ((((word) << (bits)) & 0xFFFFFFFF) | \
                 ((word) >> (32-(bits))))
+
+using namespace std;
+
+Sha1::Sha1(const string& data)
+{
+    reset();
+    update(data);
+}
 
 // This function will initialize the SHA1Context in preparation
 // for computing a new message digest.
@@ -83,7 +91,7 @@ int Sha1::result()
 }
 
 /*  
- *  input
+ *  update
  *
  *  Description:
  *      This function accepts an array of octets as the next portion of
@@ -102,13 +110,15 @@ int Sha1::result()
  *  Comments:
  *
  */
-void Sha1::input(const char* message_array,
-                 unsigned    length)
+void Sha1::update(const string& data)
 {
-    if (!length)
+    if (data.empty())
     {
         return;
     }
+
+    const char* message_array = data.c_str();
+    long        length        = data.size();
 
     if (Computed || Corrupted)
     {
@@ -118,8 +128,7 @@ void Sha1::input(const char* message_array,
 
     while(length-- && !Corrupted)
     {
-        Message_Block[Message_Block_Index++] =
-                                                (*message_array & 0xFF);
+        Message_Block[Message_Block_Index++] = (*message_array & 0xFF);
 
         Length_Low += 8;
         /* Force it to 32 bits */

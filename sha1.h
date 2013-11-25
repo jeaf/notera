@@ -24,12 +24,14 @@
 #ifndef _SHA1_H_
 #define _SHA1_H_
 
+#include <string>
+
 class Sha1
 {
 public:
-    Sha1() {reset();}
+    Sha1(const std::string& data);
     void reset();
-    void input(const char*, unsigned);
+    void update(const std::string& data);
     int  result();
 
     unsigned Message_Digest[5]; /* Message Digest (output)          */

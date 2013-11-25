@@ -58,9 +58,8 @@ const char* pwd_salt = "1kmalspdlf09sDFSDF";
 
 void add_user(const char* username, const char* pwd)
 {
-    Sha1 sha;
-    sha.input(pwd, strlen(pwd));
-    sha.input(pwd_salt, strlen(pwd_salt));
+    Sha1 sha(pwd);
+    sha.update(pwd_salt);
     sha.result();
 
     sprintf(db.sql, "INSERT INTO user(name, pwd_hash) VALUES ('%s', '%02x%02x%02x%02x%02x');", username,
@@ -183,8 +182,7 @@ int main()
 
         // Construct the expected auth token
         //char exp_token[1024];
-        Sha1 sha;
-        sha.input(user, strlen(user));
+        Sha1 sha(user);
         sprintf(db.sql, "SELECT id,pwd_hash FROM user WHERE name='%s'", user);
         rc = db.prepare_v2(db.sql, -1, &db.stmt, 0);
         rc = sqlite3_step(db.stmt);
@@ -195,10 +193,10 @@ int main()
             user_id = sqlite3_column_int64(db.stmt, 0);
             strcpy(hash_pwd, reinterpret_cast<const char*>(sqlite3_column_text(db.stmt, 1)));
         }
-        sha.input(hash_pwd, strlen(hash_pwd));
+        sha.update(hash_pwd);
         char sid_str[1024] = {0};
         sprintf(sid_str, "%lld", sid);
-        sha.input(sid_str, strlen(sid_str));
+        sha.update(sid_str);
         sha.result();
         unsigned int* s = sha.Message_Digest;
         char expected_auth_token[1024] = {0};
