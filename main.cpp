@@ -1,10 +1,11 @@
 #include "sha1.h"
 #include "sqlite3.h"
 
+#include <algorithm>
 #include <cstdio>
-#include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <map>
 #include <memory>
 #include <sstream>
 
@@ -56,6 +57,18 @@ public:
             CHECK(rc == SQLITE_DONE || rc == SQLITE_ROW, "Error when stepping SQL query: %d", rc)
             return rc;
         }
+        int column_int(int col)
+        {
+            return sqlite3_column_int(stmt_, col);
+        }
+        int64_t column_int64(int col)
+        {
+            return sqlite3_column_int64(stmt_, col);
+        }
+        string column_text(int col)
+        {
+            return reinterpret_cast<const char*>(sqlite3_column_text(stmt_, col));
+        }
         sqlite3_stmt* stmt_;
     };
 
@@ -86,7 +99,7 @@ public:
         shared_ptr<Stmt> stmt = prepare_v2("select random()", -1, 0);
         int rc = stmt->step();
         CHECK(rc == SQLITE_ROW, "Could not generate random number: %s (%d)", errmsg(), rc); 
-        return sqlite3_column_int64(stmt->stmt_, 0);
+        return stmt->column_int64(0);
     }
     sqlite3* db;
     char sql[1024];
@@ -117,24 +130,40 @@ int64_t generate_sid(Sqlite& db)
     return sid;
 }
 
-int64_t get_sid_cookie()
+int64_t get_sid_cookie(const map<string, string>& env)
 {
-    const char* cookie = getenv("HTTP_COOKIE");
-    if (cookie)
+    auto cookie_it = env.find("HTTP_COOKIE");
+    if (cookie_it != env.end())
     {
-        const char* sid_str = strstr(cookie, "sid=");
-        if (sid_str)
+        auto pos = cookie_it->second.find("sid=");
+        if (pos != string::npos)
         {
-            return lexical_cast<int64_t>(sid_str + 4);
+            return lexical_cast<int64_t>(cookie_it->second.substr(pos + 4));
         }
     }
     return 0;
 }
 
-int main()
+map<string, string> parse_env(char* env[])
+{
+    map<string, string> m;
+    while (*env)
+    {
+        string s(*env);
+        string::size_type pos = s.find_first_of('=');
+        CHECK(pos != string::npos, "Invalid environment string: %s", *env);
+        m[s.substr(0, pos)] = s.substr(pos + 1);
+        ++env;
+    }
+    return m;
+}
+
+int main(int argc, char* argv[], char* envp[])
 {
     try
     {
+        auto env = parse_env(envp);
+
         // Connect to the DB and create tables
         Sqlite db;
         db.open("db.sqlite3");
@@ -173,17 +202,15 @@ int main()
         bool authenticated = false;
 
         // Retrieve the submitted sid
-        int64_t sid = get_sid_cookie();
+        int64_t sid = get_sid_cookie(env);
 
         // Check if login request
-        const char* query_str = getenv("QUERY_STRING") ? getenv("QUERY_STRING") : "";
-        if (strstr(query_str, "login"))
+        if (env["QUERY_STRING"].find("login") != string::npos)
         {
             // Read submitted credentials from stdin
-            const char* content_len_str = getenv("CONTENT_LENGTH");
-            CHECK(content_len_str, "Invalid login request, no CONTENT_LENGTH defined.");
-            long content_len = 0;
-            sscanf(content_len_str, "%ld", &content_len);
+            auto content_len_it = env.find("CONTENT_LENGTH");
+            CHECK(content_len_it != env.end(), "Invalid login request, no CONTENT_LENGTH defined.");
+            long content_len = lexical_cast<long>(content_len_it->second);
             CHECK(content_len > 0, "Invalid login request, unexpected CONTENT_LENGTH: %d", content_len);
             CHECK(content_len < 1024, "Invalid login request, CONTENT_LENGTH too large: %d", content_len);
             char buf[1024] = {0};
@@ -216,12 +243,12 @@ int main()
             sprintf(db.sql, "SELECT id,pwd_hash FROM user WHERE name='%s'", user);
             shared_ptr<Sqlite::Stmt> stmt = db.prepare_v2(db.sql, -1, 0);
             int rc = stmt->step();
-            char hash_pwd[1024] = {0};
+            string hash_pwd;
             long long user_id = -1;
             if (rc == SQLITE_ROW)
             {
-                user_id = sqlite3_column_int64(stmt->stmt_, 0);
-                strcpy(hash_pwd, reinterpret_cast<const char*>(sqlite3_column_text(stmt->stmt_, 1)));
+                user_id = stmt->column_int64(0);
+                hash_pwd = stmt->column_text(1);
             }
             sha.update(hash_pwd);
             string sid_str = lexical_cast<string>(sid);
@@ -249,7 +276,7 @@ int main()
                 printf("Content-type: text/html\n");
                 printf("\n");
                 printf("<html><head></head><body><p>Login FAIL, user: %s, pwd_hash: %s, tok: %s, sid: %s</p></body></html>\n",
-                       user, hash_pwd, sid_str.c_str(), auth_token);
+                       user, hash_pwd.c_str(), sid_str.c_str(), auth_token);
             }
 
             return 0;
@@ -258,18 +285,10 @@ int main()
         // Not a login request, check session
         else
         {
-            // Get the age of the session from the DB
-            long sid_age = max_session_age;
             sprintf(db.sql, "SELECT (strftime('%%s', 'now') - create_time) as age FROM session WHERE id=%ld", sid);
-            shared_ptr<Sqlite::Stmt> stmt = db.prepare_v2(db.sql, -1, 0);
-            int rc = stmt->step();
-            if (rc == SQLITE_ROW)
-            {
-                sid_age = sqlite3_column_int(stmt->stmt_, 0);
-            }
-
-            // Check if the session is valid
-            if (sid_age < max_session_age) authenticated = true;
+            auto stmt = db.prepare_v2(db.sql, -1, 0);
+            long age = (stmt->step() == SQLITE_ROW) ? stmt->column_int(0) : max_session_age;
+            if (age < max_session_age) authenticated = true;
         }
 
         if (authenticated)
@@ -295,9 +314,8 @@ int main()
             // Header
             printf("HTTP/1.0 200 OK\n");
             printf("Content-type: text/html\n");
-            sid = generate_sid(db);
-            printf("Set-Cookie: sid=%ld; Max-Age=%d\n", sid, 7 * 24 * 3600);
-            printf("\n");
+            printf("Set-Cookie: sid=%ld; Max-Age=%ld\n\n",
+                   generate_sid(db), max_session_age);
 
             // Content
             FILE* login_page = fopen("login.html", "r");
@@ -315,9 +333,7 @@ int main()
     }
     catch (const std::exception& ex)
     {
-        printf("HTTP/1.0 200 OK\n");
-        printf("Content-type: text/html\n");
-        printf("\n");
+        printf("HTTP/1.0 200 OK\nContent-type: text/html\n\n");
         printf("<html><head></head><body>");
         printf("<p>An error occurred while generating this page:</p>\n<p>");
         printf("%s</p>\n</body></html>\n", ex.what());
