@@ -1,8 +1,6 @@
 #include "sha1.h"
 #include "sqlite3.h"
 
-#include <climits>
-#include <cstdbool>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -13,6 +11,8 @@
 #define CHECK(cond, msg, ...) if (!(cond)) error(msg, __FILE__, __FUNCTION__, __LINE__, ##__VA_ARGS__);
 
 using namespace std;
+
+const long max_session_age = 7 * 24 * 3600;
 
 void error(const char* msg, const char* file, const char* func, long line, ...)
 {
@@ -30,10 +30,10 @@ Target lexical_cast(const Source& arg)
 {
     stringstream ss;
     ss << arg;
-    if (ss.fail()) {}
+    CHECK(!ss.fail(), "lexical_cast error")
     Target out;
     ss >> out;
-    if (ss.fail()) {}
+    CHECK(!ss.fail(), "lexical_cast error")
     return out;
 }
 
@@ -48,8 +48,13 @@ public:
         }
         ~Stmt()
         {
-            int rc = sqlite3_finalize(stmt_);
-            (void)rc;
+            sqlite3_finalize(stmt_);
+        }
+        int step()
+        {
+            int rc = sqlite3_step(stmt_);
+            CHECK(rc == SQLITE_DONE || rc == SQLITE_ROW, "Error when stepping SQL query: %d", rc)
+            return rc;
         }
         sqlite3_stmt* stmt_;
     };
@@ -64,7 +69,7 @@ public:
     {
         sqlite3_stmt* stmt = NULL;
         int rc = sqlite3_prepare_v2(db, zSql, nByte, &stmt, pzTail);
-        CHECK(rc == SQLITE_OK, "Can't prepare statement: %s", errmsg());
+        CHECK(rc == SQLITE_OK, "Can't prepare statement: %s, (%d)", errmsg(), rc);
         return shared_ptr<Stmt>(new Stmt(stmt));
     }
     void open(const char *filename)
@@ -75,6 +80,13 @@ public:
     const char* errmsg()
     {
         return sqlite3_errmsg(db);
+    }
+    int64_t random_int64()
+    {
+        shared_ptr<Stmt> stmt = prepare_v2("select random()", -1, 0);
+        int rc = stmt->step();
+        CHECK(rc == SQLITE_ROW, "Could not generate random number: %s (%d)", errmsg(), rc); 
+        return sqlite3_column_int64(stmt->stmt_, 0);
     }
     sqlite3* db;
     char sql[1024];
@@ -92,37 +104,31 @@ void add_user(Sqlite& db, const char* username, const char* pwd)
     db.exec(db.sql, NULL, NULL, NULL);
 }
 
-int generate_sid(Sqlite& db, int64_t* oSid)
+int64_t generate_sid(Sqlite& db)
 {
-    *oSid = 0;
-    shared_ptr<Sqlite::Stmt> stmt = db.prepare_v2("select random()", -1, 0);
-    int rc = sqlite3_step(stmt->stmt_);
-    if (rc == SQLITE_ROW) *oSid = sqlite3_column_int64(stmt->stmt_, 0);
-    else printf("error\n");
-    if (*oSid < 0)
+    int64_t sid = db.random_int64();
+    if (sid < 0)
     {
-        *oSid += 1; // Add 1 to avoid overflowing, if the negative number was
-                    // the smallest one possible
-        *oSid *= -1;
+        sid += 1; // Add 1 to avoid overflowing, if the negative number was
+                  // the smallest one possible
+        sid *= -1;
     }
-    if (*oSid == 0) *oSid = 1;
-    return 1;
+    if (sid == 0) return 1;
+    return sid;
 }
 
-int get_sid_cookie(int64_t* oSid)
+int64_t get_sid_cookie()
 {
-    *oSid = 0;
     const char* cookie = getenv("HTTP_COOKIE");
     if (cookie)
     {
         const char* sid_str = strstr(cookie, "sid=");
         if (sid_str)
         {
-            sid_str += 4;
-            *oSid = lexical_cast<int64_t>(sid_str);
+            return lexical_cast<int64_t>(sid_str + 4);
         }
     }
-    return 1;
+    return 0;
 }
 
 int main()
@@ -167,8 +173,7 @@ int main()
         bool authenticated = false;
 
         // Retrieve the submitted sid
-        int64_t sid;
-        get_sid_cookie(&sid);
+        int64_t sid = get_sid_cookie();
 
         // Check if login request
         const char* query_str = getenv("QUERY_STRING") ? getenv("QUERY_STRING") : "";
@@ -210,7 +215,7 @@ int main()
             Sha1 sha(user);
             sprintf(db.sql, "SELECT id,pwd_hash FROM user WHERE name='%s'", user);
             shared_ptr<Sqlite::Stmt> stmt = db.prepare_v2(db.sql, -1, 0);
-            int rc = sqlite3_step(stmt->stmt_);
+            int rc = stmt->step();
             char hash_pwd[1024] = {0};
             long long user_id = -1;
             if (rc == SQLITE_ROW)
@@ -254,17 +259,17 @@ int main()
         else
         {
             // Get the age of the session from the DB
-            int sid_age = INT_MAX;
+            long sid_age = max_session_age;
             sprintf(db.sql, "SELECT (strftime('%%s', 'now') - create_time) as age FROM session WHERE id=%ld", sid);
             shared_ptr<Sqlite::Stmt> stmt = db.prepare_v2(db.sql, -1, 0);
-            int rc = sqlite3_step(stmt->stmt_);
+            int rc = stmt->step();
             if (rc == SQLITE_ROW)
             {
                 sid_age = sqlite3_column_int(stmt->stmt_, 0);
             }
 
             // Check if the session is valid
-            if (sid_age < 7 * 24 * 3600) authenticated = true;
+            if (sid_age < max_session_age) authenticated = true;
         }
 
         if (authenticated)
@@ -290,7 +295,7 @@ int main()
             // Header
             printf("HTTP/1.0 200 OK\n");
             printf("Content-type: text/html\n");
-            generate_sid(db, &sid);
+            sid = generate_sid(db);
             printf("Set-Cookie: sid=%ld; Max-Age=%d\n", sid, 7 * 24 * 3600);
             printf("\n");
 
