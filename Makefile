@@ -1,6 +1,6 @@
 CFLAGS   = -std=c99
-CXXFLAGS = -std=c++0x
-CPPFLAGS = -Wall -O0
+CXXFLAGS = -std=c++0x -Wall -Werror
+CPPFLAGS = -O3
 EXEC     = main.exe
 
 OBJS           = main.o sha1.o sqlite3.o

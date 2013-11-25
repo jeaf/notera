@@ -7,10 +7,23 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <sstream>
+
+#define CHECK(cond, msg, ...) if (!(cond)) error(msg, __FILE__, __FUNCTION__, __LINE__, ##__VA_ARGS__);
 
 using namespace std;
 
-#define CHECK(cond, msg, ...) if (!(cond)) error(msg, __FILE__, __FUNCTION__, __LINE__, ##__VA_ARGS__);
+template <typename Target, typename Source>
+Target lexical_cast(const Source& arg)
+{
+    stringstream ss;
+    ss << arg;
+    if (ss.fail()) {}
+    Target out;
+    ss >> out;
+    if (ss.fail()) {}
+    return out;
+}
 
 class Sqlite
 {
@@ -95,7 +108,7 @@ int get_sid_cookie(int64_t* oSid)
         if (sid_str)
         {
             sid_str += 4;
-            sscanf(sid_str, "%lld", oSid);
+            *oSid = lexical_cast<int64_t>(sid_str);
         }
     }
     return 1;
@@ -194,8 +207,7 @@ int main()
             strcpy(hash_pwd, reinterpret_cast<const char*>(sqlite3_column_text(db.stmt, 1)));
         }
         sha.update(hash_pwd);
-        char sid_str[1024] = {0};
-        sprintf(sid_str, "%lld", sid);
+        string sid_str = lexical_cast<string>(sid);
         sha.update(sid_str);
         sha.result();
         unsigned int* s = sha.Message_Digest;
@@ -206,7 +218,7 @@ int main()
         if (strcmp(expected_auth_token, auth_token) == 0)
         {
             // User is authenticated, store the session
-            sprintf(db.sql, "INSERT INTO session(id, user_id) VALUES(%lld, %lld)", sid, user_id);
+            sprintf(db.sql, "INSERT INTO session(id, user_id) VALUES(%ld, %lld)", sid, user_id);
             int rc = db.exec(db.sql, NULL, NULL, NULL);
             CHECK(rc == SQLITE_OK, "Can't insert session: %d", rc);
             printf("HTTP/1.0 200 OK\n");
@@ -221,7 +233,7 @@ int main()
             printf("Content-type: text/html\n");
             printf("\n");
             printf("<html><head></head><body><p>Login FAIL, user: %s, pwd_hash: %s, tok: %s, sid: %s</p></body></html>\n",
-                   user, hash_pwd, sid_str, auth_token);
+                   user, hash_pwd, sid_str.c_str(), auth_token);
         }
 
         return 0;
@@ -232,7 +244,7 @@ int main()
     {
         // Get the age of the session from the DB
         int sid_age = INT_MAX;
-        sprintf(db.sql, "SELECT (strftime('%%s', 'now') - create_time) as age FROM session WHERE id=%lld", sid);
+        sprintf(db.sql, "SELECT (strftime('%%s', 'now') - create_time) as age FROM session WHERE id=%ld", sid);
         rc = db.prepare_v2(db.sql, -1, &db.stmt, 0);
         CHECK(rc == SQLITE_OK, "Session ID retrieval failed: %d", rc);
         rc = sqlite3_step(db.stmt);
@@ -269,7 +281,7 @@ int main()
         printf("HTTP/1.0 200 OK\n");
         printf("Content-type: text/html\n");
         generate_sid(&sid);
-        printf("Set-Cookie: sid=%lld; Max-Age=%d\n", sid, 7 * 24 * 3600);
+        printf("Set-Cookie: sid=%ld; Max-Age=%d\n", sid, 7 * 24 * 3600);
         printf("\n");
 
         // Content
