@@ -35,15 +35,15 @@ const char* pwd_salt = "1kmalspdlf09sDFSDF";
 
 void add_user(const char* username, const char* pwd)
 {
-    SHA1Context sha1_con;
-    SHA1Reset(&sha1_con);
-    SHA1Input(&sha1_con, pwd, strlen(pwd));
-    SHA1Input(&sha1_con, pwd_salt, strlen(pwd_salt));
-    SHA1Result(&sha1_con);
+    Sha1 sha;
+    sha.reset();
+    sha.input(pwd, strlen(pwd));
+    sha.input(pwd_salt, strlen(pwd_salt));
+    sha.result();
 
     char sql_buf[1024] = {0};
     sprintf(sql_buf, "INSERT INTO user(name, pwd_hash) VALUES ('%s', '%02x%02x%02x%02x%02x');", username,
-        sha1_con.Message_Digest[0], sha1_con.Message_Digest[1], sha1_con.Message_Digest[2], sha1_con.Message_Digest[3], sha1_con.Message_Digest[4]);
+        sha.Message_Digest[0], sha.Message_Digest[1], sha.Message_Digest[2], sha.Message_Digest[3], sha.Message_Digest[4]);
     int rc = sqlite3_exec(db, sql_buf, NULL, NULL, NULL);
     CHECK(rc == SQLITE_OK, "Can't insert user: %s", sqlite3_errmsg(db))
 }
@@ -134,7 +134,7 @@ int main()
         const char* content_len_str = getenv("CONTENT_LENGTH");
         CHECK(content_len_str, "Invalid login request, no CONTENT_LENGTH defined.");
         long content_len = 0;
-        sscanf(content_len_str, "%d", &content_len);
+        sscanf(content_len_str, "%ld", &content_len);
         CHECK(content_len > 0, "Invalid login request, unexpected CONTENT_LENGTH: %d", content_len);
         CHECK(content_len < 1024, "Invalid login request, CONTENT_LENGTH too large: %d", content_len);
         char buf[1024] = {0};
@@ -162,10 +162,10 @@ int main()
         }
 
         // Construct the expected auth token
-        char exp_token[1024];
-        SHA1Context sha1_con;
-        SHA1Reset(&sha1_con);
-        SHA1Input(&sha1_con, user, strlen(user));
+        //char exp_token[1024];
+        Sha1 sha;
+        sha.reset();
+        sha.input(user, strlen(user));
         char sql[1024];
         sprintf(sql, "SELECT id,pwd_hash FROM user WHERE name='%s'", user);
         rc = sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
@@ -175,14 +175,14 @@ int main()
         if (rc == SQLITE_ROW)
         {
             user_id = sqlite3_column_int64(stmt, 0);
-            strcpy(hash_pwd, sqlite3_column_text(stmt, 1));
+            strcpy(hash_pwd, reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1)));
         }
-        SHA1Input(&sha1_con, hash_pwd, strlen(hash_pwd));
+        sha.input(hash_pwd, strlen(hash_pwd));
         char sid_str[1024] = {0};
         sprintf(sid_str, "%lld", sid);
-        SHA1Input(&sha1_con, sid_str, strlen(sid_str));
-        SHA1Result(&sha1_con);
-        unsigned int* s = sha1_con.Message_Digest;
+        sha.input(sid_str, strlen(sid_str));
+        sha.result();
+        unsigned int* s = sha.Message_Digest;
         char expected_auth_token[1024] = {0};
         sprintf(expected_auth_token, "%02x%02x%02x%02x%02x", s[0], s[1], s[2], s[3], s[4]);
 
@@ -193,6 +193,7 @@ int main()
             char sql[1024];
             sprintf(sql, "INSERT INTO session(id, user_id) VALUES(%lld, %lld)", sid, user_id);
             int rc = sqlite3_exec(db, sql, NULL, NULL, NULL);
+            CHECK(rc == SQLITE_OK, "Can't insert session: %d", rc);
             printf("HTTP/1.0 200 OK\n");
             printf("Content-type: text/html\n");
             printf("\n");
