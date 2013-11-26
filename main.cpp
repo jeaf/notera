@@ -15,6 +15,33 @@ using namespace std;
 
 const long max_session_age = 7 * 24 * 3600;
 
+vector<string> log_env_vars{"CONTENT_LENGTH",
+                            "CONTENT_TYPE",
+                            "DOCUMENT_ROOT",
+                            "GATEWAY_INTERFACE",
+                            "HTTP_ACCEPT",
+                            "HTTP_COOKIE",
+                            "HTTP_HOST",
+                            "HTTP_REFERER",
+                            "HTTP_USER_AGENT",
+                            "HTTPS",
+                            "PATH",
+                            "PATH_INFO",
+                            "PATH_TRANSLATED",
+                            "QUERY_STRING",
+                            "REMOTE_ADDR",
+                            "REMOTE_HOST",
+                            "REMOTE_PORT",
+                            "REMOTE_USER",
+                            "REQUEST_METHOD",
+                            "REQUEST_URI",
+                            "SCRIPT_FILENAME",
+                            "SCRIPT_NAME",
+                            "SERVER_ADMIN",
+                            "SERVER_NAME",
+                            "SERVER_PORT",
+                            "SERVER_SOFTWARE"};
+
 void error(const char* msg, const char* file, const char* func, long line, ...)
 {
     va_list args;
@@ -167,32 +194,57 @@ int main(int argc, char* argv[], char* envp[])
         // Connect to the DB and create tables
         Sqlite db;
         db.open("db.sqlite3");
-        db.exec(
-             "CREATE TABLE IF  NOT EXISTS note("
-             "    id           INTEGER PRIMARY KEY,"
-             "    title        TEXT,"
-             "    content      TEXT);"
-             "CREATE TABLE IF  NOT EXISTS session("
-             "    id           INTEGER PRIMARY KEY,"
-             "    user_id      INTEGER NOT NULL,"
-             "    create_time  INTEGER NOT NULL DEFAULT (strftime('%s', 'now')));"
-             "CREATE TABLE IF  NOT EXISTS user("
-             "    id           INTEGER PRIMARY KEY,"
-             "    name         TEXT NOT NULL UNIQUE,"
-             "    pwd_hash     TEXT NOT NULL);"
-             "CREATE TABLE IF  NOT EXISTS log("
-             "    id           INTEGER PRIMARY KEY,"
-             "    time         INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),"
-             "    HTTP_COOKIE  TEXT,"
-             "    HTTP_USER_AGENT TEXT,"
-             "    QUERY_STRING TEXT);"
-             "CREATE TABLE IF  NOT EXISTS note_user_rel("
-             "    user_id      INTEGER NOT NULL,"
-             "    note_id      INTEGER NOT NULL,"
-             "    PRIMARY KEY(user_id, note_id),"
-             "    FOREIGN KEY(user_id) REFERENCES user(id) ON DELETE CASCADE,"
-             "    FOREIGN KEY(note_id) REFERENCES note(id) ON DELETE CASCADE);",
-             0, 0, 0);
+        db.exec("CREATE TABLE IF  NOT EXISTS note("
+                "    id           INTEGER PRIMARY KEY,"
+                "    title        TEXT,"
+                "    content      TEXT);"
+                "CREATE TABLE IF  NOT EXISTS session("
+                "    id           INTEGER PRIMARY KEY,"
+                "    user_id      INTEGER NOT NULL,"
+                "    create_time  INTEGER NOT NULL DEFAULT (strftime('%s', 'now')));"
+                "CREATE TABLE IF  NOT EXISTS user("
+                "    id           INTEGER PRIMARY KEY,"
+                "    name         TEXT NOT NULL UNIQUE,"
+                "    pwd_hash     TEXT NOT NULL);"
+                "CREATE TABLE IF  NOT EXISTS note_user_rel("
+                "    user_id      INTEGER NOT NULL,"
+                "    note_id      INTEGER NOT NULL,"
+                "    PRIMARY KEY(user_id, note_id),"
+                "    FOREIGN KEY(user_id) REFERENCES user(id) ON DELETE CASCADE,"
+                "    FOREIGN KEY(note_id) REFERENCES note(id) ON DELETE CASCADE);",
+                0, 0, 0);
+        string log_def("CREATE TABLE IF NOT EXISTS log("
+                       "    id           INTEGER PRIMARY KEY,"
+                       "    time         INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),");
+        for (auto i = log_env_vars.begin(); i != log_env_vars.end(); ++i)
+        {
+            log_def += *i;
+            log_def += " TEXT,";
+        }
+        log_def.back() = ')';
+        log_def += ";";
+        db.exec(log_def.c_str(), 0, 0, 0);
+
+        // Log the request
+        // todo
+        string sql_str("INSERT INTO log(");
+        for (auto i = log_env_vars.begin(); i != log_env_vars.end(); ++i)
+        {
+            sql_str += *i;
+            sql_str += ",";
+        }
+        sql_str.back() = ')';
+        sql_str += " VALUES(";
+        for (auto i = log_env_vars.begin(); i != log_env_vars.end(); ++i)
+        {
+            sql_str += "'";
+            sql_str += env[*i];
+            sql_str += "'";
+            sql_str += ",";
+        }
+        sql_str.back() = ')';
+        cout << sql_str << endl;
+        db.exec(sql_str.c_str(), 0, 0, 0);
 
         // Create a user
         //add_user(db, "abc", "def");
