@@ -9,7 +9,10 @@
 #include <memory>
 #include <sstream>
 
+#include <boost/foreach.hpp>
+
 #define CHECK(cond, msg, ...) if (!(cond)) error(msg, __FILE__, __FUNCTION__, __LINE__, ##__VA_ARGS__);
+#define foreach_ BOOST_FOREACH
 
 using namespace std;
 
@@ -216,9 +219,9 @@ int main(int argc, char* argv[], char* envp[])
         string log_def("CREATE TABLE IF NOT EXISTS log("
                        "    id           INTEGER PRIMARY KEY,"
                        "    time         INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),");
-        for (auto i = log_env_vars.begin(); i != log_env_vars.end(); ++i)
+        foreach_(const string& s, log_env_vars)
         {
-            log_def += *i;
+            log_def += s;
             log_def += " TEXT,";
         }
         log_def.back() = ')';
@@ -228,17 +231,17 @@ int main(int argc, char* argv[], char* envp[])
         // Log the request
         // todo
         string sql_str("INSERT INTO log(");
-        for (auto i = log_env_vars.begin(); i != log_env_vars.end(); ++i)
+        foreach_(const string& s, log_env_vars)
         {
-            sql_str += *i;
+            sql_str += s;
             sql_str += ",";
         }
         sql_str.back() = ')';
         sql_str += " VALUES(";
-        for (auto i = log_env_vars.begin(); i != log_env_vars.end(); ++i)
+        foreach_(const string& s, log_env_vars)
         {
             sql_str += "'";
-            sql_str += env[*i];
+            sql_str += env[s];
             sql_str += "'";
             sql_str += ",";
         }

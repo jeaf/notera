@@ -1,5 +1,5 @@
 CFLAGS   = -std=c99
-CXXFLAGS = -std=c++0x -Wall -Werror
+CXXFLAGS = -std=c++0x -Wall -Werror -I.
 CPPFLAGS = -O3
 EXEC     = main.exe
 
