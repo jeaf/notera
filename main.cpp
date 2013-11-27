@@ -10,6 +10,7 @@
 #include <sstream>
 
 #include <boost/foreach.hpp>
+#include <boost/lexical_cast.hpp>
 
 #define CHECK(cond, msg, ...) if (!(cond)) error(msg, __FILE__, __FUNCTION__, __LINE__, ##__VA_ARGS__);
 #define foreach_ BOOST_FOREACH
@@ -54,18 +55,6 @@ void error(const char* msg, const char* file, const char* func, long line, ...)
     ostringstream oss;
     oss << buf << " [" << file << "!" << func << ":" << line << "]";
     throw runtime_error(oss.str());
-}
-
-template <typename Target, typename Source>
-Target lexical_cast(const Source& arg)
-{
-    stringstream ss;
-    ss << arg;
-    CHECK(!ss.fail(), "lexical_cast error")
-    Target out;
-    ss >> out;
-    CHECK(!ss.fail(), "lexical_cast error")
-    return out;
 }
 
 class Sqlite
@@ -168,7 +157,7 @@ int64_t get_sid_cookie(const map<string, string>& env)
         auto pos = cookie_it->second.find("sid=");
         if (pos != string::npos)
         {
-            return lexical_cast<int64_t>(cookie_it->second.substr(pos + 4));
+            return boost::lexical_cast<int64_t>(cookie_it->second.substr(pos + 4));
         }
     }
     return 0;
@@ -265,7 +254,7 @@ int main(int argc, char* argv[], char* envp[])
             // Read submitted credentials from stdin
             auto content_len_it = env.find("CONTENT_LENGTH");
             CHECK(content_len_it != env.end(), "Invalid login request, no CONTENT_LENGTH defined.");
-            long content_len = lexical_cast<long>(content_len_it->second);
+            long content_len = boost::lexical_cast<long>(content_len_it->second);
             CHECK(content_len > 0, "Invalid login request, unexpected CONTENT_LENGTH: %d", content_len);
             CHECK(content_len < 1024, "Invalid login request, CONTENT_LENGTH too large: %d", content_len);
             char buf[1024] = {0};
@@ -306,7 +295,7 @@ int main(int argc, char* argv[], char* envp[])
                 hash_pwd = stmt->column_text(1);
             }
             sha.update(hash_pwd);
-            string sid_str = lexical_cast<string>(sid);
+            string sid_str = boost::lexical_cast<string>(sid);
             sha.update(sid_str);
             sha.result();
             unsigned int* s = sha.Message_Digest;
