@@ -110,7 +110,7 @@ public:
         sqlite3_stmt* stmt = NULL;
         int rc = sqlite3_prepare_v2(db, zSql, nByte, &stmt, pzTail);
         CHECK(rc == SQLITE_OK, "Can't prepare statement: %s, (%d)", errmsg(), rc);
-        return shared_ptr<Stmt>(new Stmt(stmt));
+        return make_shared<Stmt>(stmt);
     }
     void open(const char *filename)
     {
