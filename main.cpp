@@ -11,6 +11,9 @@
 
 #include <boost/foreach.hpp>
 #include <boost/format.hpp>
+#include <boost/lambda/lambda.hpp>
+#include <boost/lambda/bind.hpp>
+#include <boost/lambda/algorithm.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/tokenizer.hpp>
 
@@ -18,6 +21,7 @@
 #define foreach_ BOOST_FOREACH
 
 using namespace boost;
+using namespace boost::lambda;
 using namespace std;
 
 const long max_session_age = 7 * 24 * 3600;
@@ -192,6 +196,7 @@ map<string, string> parse_env(char* env[])
 int main(int argc, char* argv[], char* envp[])
 {
     //printf("HTTP/1.0 200 OK\nContent-type: text/html\n\n");
+    std::for_each(log_env_vars.begin(), log_env_vars.end(), cout << _1 << "\n");
     printf("Content-type: text/html\n\n");
     cout << format("test %2% %1%") % "def" % "abc" << endl;
     return 0;
