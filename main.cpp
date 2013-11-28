@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <fstream>
 #include <iostream>
 #include <map>
 #include <memory>
@@ -62,6 +63,33 @@ void error(const char* msg, const char* file, const char* func, long line, ...)
     ostringstream oss;
     oss << buf << " [" << file << "!" << func << ":" << line << "]";
     throw runtime_error(oss.str());
+}
+
+class Cookie
+{
+public:
+    Cookie(const string& name, const string& value, long max_age)
+        : name_(name), value_(value), max_age_(max_age) {}
+    string get_header() const
+    {
+        return str(format("Set-Cookie: %s=%s; Max-Age=%ld") % name_ % value_ % max_age_);
+    }
+private:
+    string name_;
+    string value_;
+    long   max_age_;
+};
+
+string get_file_contents(const char* filename)
+{
+    ifstream in(filename, ios::in | ios::binary);
+    CHECK(in, "Count not read file %s, error: %d", filename, errno);
+    string contents;
+    in.seekg(0, std::ios::end);
+    contents.resize(in.tellg());
+    in.seekg(0, std::ios::beg);
+    in.read(&contents[0], contents.size());
+    return contents;
 }
 
 class Sqlite
@@ -143,7 +171,7 @@ void add_user(Sqlite& db, const char* username, const char* pwd)
     db.exec(db.sql, NULL, NULL, NULL);
 }
 
-int64_t generate_sid(Sqlite& db)
+int64_t gen_sid(Sqlite& db)
 {
     int64_t sid = db.random_int64();
     if (sid < 0)
@@ -208,18 +236,21 @@ map<string, string> build_map(const string& s,
     return m;
 }
 
+void response(const string& resp)
+{
+    cout << "Content-type: text/html\n\n";
+    cout << format("<html><head></head><body>%s</body></html>") % resp;
+}
+
+void response(const string& resp, const Cookie& c)
+{
+    cout << "Content-type: text/html" << endl;
+    cout << c.get_header() << endl << endl;
+    cout << format("<html><head></head><body>%s</body></html>") % resp;
+}
+
 int main(int argc, char* argv[], char* envp[])
 {
-    //printf("HTTP/1.0 200 OK\nContent-type: text/html\n\n");
-    printf("Content-type: text/html\n\n");
-    cout << format("test %s %s") % "def" % "abc" << endl;
-    strmap m = build_map("abc=2;def=3", ";", "=");
-    foreach_(strmap::value_type p, m)
-    {
-        cout << p.first << " - " << p.second << endl;
-    }
-    return 0;
-
     try
     {
         auto env = parse_env(envp);
@@ -349,19 +380,13 @@ int main(int argc, char* argv[], char* envp[])
                 // User is authenticated, store the session
                 sprintf(db.sql, "INSERT INTO session(id, user_id) VALUES(%ld, %lld)", sid, user_id);
                 db.exec(db.sql, NULL, NULL, NULL);
-                printf("HTTP/1.0 200 OK\n");
-                printf("Content-type: text/html\n");
-                printf("\n");
-                printf("<html><head></head><body><p>Login successful!</p></body></html>\n");
+                response("<p>Login successful!</p>");
                 authenticated = true;
             }
             else
             {
-                printf("HTTP/1.0 200 OK\n");
-                printf("Content-type: text/html\n");
-                printf("\n");
-                printf("<html><head></head><body><p>Login FAIL, user: %s, pwd_hash: %s, tok: %s, sid: %s</p></body></html>\n",
-                       user, hash_pwd.c_str(), sid_str.c_str(), auth_token);
+                response(str(format("<p>Login FAIL, user: %s, pwd_hash: %s, tok: %s, sid: %s</p>")
+                         % user % hash_pwd % sid_str % auth_token));
             }
 
             return 0;
@@ -378,50 +403,20 @@ int main(int argc, char* argv[], char* envp[])
 
         if (authenticated)
         {
-            // Header
-            printf("HTTP/1.0 200 OK\n");
-            printf("Content-type: text/html\n");
-            printf("\n");
-
-            // Content
-            FILE* login_page = fopen("app.html", "r");
-            char buf[2048] = {0};
-            long len = fread(buf, 1, sizeof(buf) - 1, login_page);
-            while (len > 0)
-            {
-                buf[len] = 0;
-                printf("%s", buf);
-                len = fread(buf, 1, sizeof(buf) - 1, login_page);
-            }
+            response(get_file_contents("app.html"));
         }
         else
         {
-            // Header
-            printf("HTTP/1.0 200 OK\n");
-            printf("Content-type: text/html\n");
-            printf("Set-Cookie: sid=%ld; Max-Age=%ld\n\n",
-                   generate_sid(db), max_session_age);
-
-            // Content
-            FILE* login_page = fopen("login.html", "r");
-            char buf[2048] = {0};
-            long len = fread(buf, 1, sizeof(buf) - 1, login_page);
-            while (len > 0)
-            {
-                buf[len] = 0;
-                printf("%s", buf);
-                len = fread(buf, 1, sizeof(buf) - 1, login_page);
-            }
+            response(get_file_contents("login.html"),
+                     Cookie("sid", str(format("%ld") % gen_sid(db)), max_session_age));
         }
 
         return 0;
     }
     catch (const std::exception& ex)
     {
-        printf("HTTP/1.0 200 OK\nContent-type: text/html\n\n");
-        printf("<html><head></head><body>");
-        printf("<p>An error occurred while generating this page:</p>\n");
-        cout << format("<p>%1%</p></body></html>") % ex.what() << endl;
+        response(str(format("<p>An error occurred while generating this page:</p><p>%s</p></body></html>")
+                 % ex.what()));
     }
 
     return 1;
