@@ -10,6 +10,7 @@
 #include <sstream>
 
 #include <boost/foreach.hpp>
+#include <boost/format.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/tokenizer.hpp>
 
@@ -192,7 +193,8 @@ int main(int argc, char* argv[], char* envp[])
 {
     //printf("HTTP/1.0 200 OK\nContent-type: text/html\n\n");
     printf("Content-type: text/html\n\n");
-    printf("test");
+    cout << format("test %2% %1%") % "def" % "abc" << endl;
+    return 0;
 
     try
     {
@@ -394,8 +396,8 @@ int main(int argc, char* argv[], char* envp[])
     {
         printf("HTTP/1.0 200 OK\nContent-type: text/html\n\n");
         printf("<html><head></head><body>");
-        printf("<p>An error occurred while generating this page:</p>\n<p>");
-        printf("%s</p>\n</body></html>\n", ex.what());
+        printf("<p>An error occurred while generating this page:</p>\n");
+        cout << format("<p>%1%</p></body></html>") % ex.what() << endl;
     }
 
     return 1;
