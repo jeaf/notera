@@ -27,6 +27,21 @@ typedef map<std::string, std::string> strmap;
 
 const long max_session_age = 7 * 24 * 3600;
 
+string fmt_impl(const format& f) {return str(f);}
+
+template <typename T, typename... Ts>
+string fmt_impl(format& f, const T& arg, Ts... args)
+{
+    return fmt_impl(f % arg, args...);
+}
+
+template <typename T, typename... Ts>
+string fmt(const string& s, const T& arg, Ts... args)
+{
+    format f(s);
+    return fmt_impl(f % arg, args...);
+}
+
 vector<string> log_env_vars{"CONTENT_LENGTH",
                             "CONTENT_TYPE",
                             "DOCUMENT_ROOT",
@@ -415,8 +430,7 @@ int main(int argc, char* argv[], char* envp[])
     }
     catch (const std::exception& ex)
     {
-        response(str(format("<p>An error occurred while generating this page:</p><p>%s</p></body></html>")
-                 % ex.what()));
+        response(fmt("<p>An error occurred while generating this page:</p><p>%s</p></body></html>", ex.what()));
     }
 
     return 1;
