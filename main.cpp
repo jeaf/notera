@@ -11,10 +11,12 @@
 
 #include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/tokenizer.hpp>
 
 #define CHECK(cond, msg, ...) if (!(cond)) error(msg, __FILE__, __FUNCTION__, __LINE__, ##__VA_ARGS__);
 #define foreach_ BOOST_FOREACH
 
+using namespace boost;
 using namespace std;
 
 const long max_session_age = 7 * 24 * 3600;
@@ -97,7 +99,7 @@ public:
         int rc = sqlite3_exec(db, sql_buf, callback, arg1, error_msg);
         CHECK(rc == SQLITE_OK, "Can't execute: %s (%d)", errmsg(), rc)
     }
-    shared_ptr<Stmt> prepare_v2(const char *zSql, int nByte, const char **pzTail)
+    std::shared_ptr<Stmt> prepare_v2(const char *zSql, int nByte, const char **pzTail)
     {
         sqlite3_stmt* stmt = NULL;
         int rc = sqlite3_prepare_v2(db, zSql, nByte, &stmt, pzTail);
@@ -115,7 +117,7 @@ public:
     }
     int64_t random_int64()
     {
-        shared_ptr<Stmt> stmt = prepare_v2("select random()", -1, 0);
+        std::shared_ptr<Stmt> stmt = prepare_v2("select random()", -1, 0);
         int rc = stmt->step();
         CHECK(rc == SQLITE_ROW, "Could not generate random number: %s (%d)", errmsg(), rc); 
         return stmt->column_int64(0);
@@ -154,10 +156,19 @@ int64_t get_sid_cookie(const map<string, string>& env)
     auto cookie_it = env.find("HTTP_COOKIE");
     if (cookie_it != env.end())
     {
-        auto pos = cookie_it->second.find("sid=");
-        if (pos != string::npos)
+        tokenizer<char_separator<char>> tok(cookie_it->second, char_separator<char>(","));
+        foreach_(const string& s, tok)
         {
-            return boost::lexical_cast<int64_t>(cookie_it->second.substr(pos + 4));
+            tokenizer<char_separator<char>> tok2(cookie_it->second, char_separator<char>("="));
+            foreach_(const string& s2, tok2)
+            {
+                
+            }
+            auto pos = cookie_it->second.find("sid=");
+            if (pos != string::npos)
+            {
+                return lexical_cast<int64_t>(cookie_it->second.substr(pos + 4));
+            }
         }
     }
     return 0;
@@ -254,7 +265,7 @@ int main(int argc, char* argv[], char* envp[])
             // Read submitted credentials from stdin
             auto content_len_it = env.find("CONTENT_LENGTH");
             CHECK(content_len_it != env.end(), "Invalid login request, no CONTENT_LENGTH defined.");
-            long content_len = boost::lexical_cast<long>(content_len_it->second);
+            long content_len = lexical_cast<long>(content_len_it->second);
             CHECK(content_len > 0, "Invalid login request, unexpected CONTENT_LENGTH: %d", content_len);
             CHECK(content_len < 1024, "Invalid login request, CONTENT_LENGTH too large: %d", content_len);
             char buf[1024] = {0};
@@ -285,7 +296,7 @@ int main(int argc, char* argv[], char* envp[])
             //char exp_token[1024];
             Sha1 sha(user);
             sprintf(db.sql, "SELECT id,pwd_hash FROM user WHERE name='%s'", user);
-            shared_ptr<Sqlite::Stmt> stmt = db.prepare_v2(db.sql, -1, 0);
+            std::shared_ptr<Sqlite::Stmt> stmt = db.prepare_v2(db.sql, -1, 0);
             int rc = stmt->step();
             string hash_pwd;
             long long user_id = -1;
@@ -295,7 +306,7 @@ int main(int argc, char* argv[], char* envp[])
                 hash_pwd = stmt->column_text(1);
             }
             sha.update(hash_pwd);
-            string sid_str = boost::lexical_cast<string>(sid);
+            string sid_str = lexical_cast<string>(sid);
             sha.update(sid_str);
             sha.result();
             unsigned int* s = sha.Message_Digest;
