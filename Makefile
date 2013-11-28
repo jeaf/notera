@@ -1,7 +1,7 @@
 CFLAGS   = -std=c99
 CXXFLAGS = -std=c++0x -I.
-CPPFLAGS = -O3
-EXEC     = main.exe
+CPPFLAGS = -O0
+EXEC     = main.cgi
 
 OBJS           = main.o sha1.o sqlite3.o
 SQLITE_FLAGS   = -DSQLITE_THREADSAFE=0 -DSQLITE_OMIT_LOAD_EXTENSION -DSQLITE_TEMP_STORE=3

@@ -190,6 +190,10 @@ map<string, string> parse_env(char* env[])
 
 int main(int argc, char* argv[], char* envp[])
 {
+    //printf("HTTP/1.0 200 OK\nContent-type: text/html\n\n");
+    printf("Content-type: text/html\n\n");
+    printf("test");
+
     try
     {
         auto env = parse_env(envp);
@@ -224,7 +228,7 @@ int main(int argc, char* argv[], char* envp[])
             log_def += s;
             log_def += " TEXT,";
         }
-        log_def.back() = ')';
+        *log_def.rbegin() = ')';
         log_def += ";";
         db.exec(log_def.c_str(), 0, 0, 0);
 
@@ -236,7 +240,7 @@ int main(int argc, char* argv[], char* envp[])
             sql_str += s;
             sql_str += ",";
         }
-        sql_str.back() = ')';
+        *sql_str.rbegin() = ')';
         sql_str += " VALUES(";
         foreach_(const string& s, log_env_vars)
         {
@@ -245,7 +249,7 @@ int main(int argc, char* argv[], char* envp[])
             sql_str += "'";
             sql_str += ",";
         }
-        sql_str.back() = ')';
+        *sql_str.rbegin() = ')';
         cout << sql_str << endl;
         db.exec(sql_str.c_str(), 0, 0, 0);
 
