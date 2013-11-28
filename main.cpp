@@ -11,9 +11,6 @@
 
 #include <boost/foreach.hpp>
 #include <boost/format.hpp>
-#include <boost/lambda/lambda.hpp>
-#include <boost/lambda/bind.hpp>
-#include <boost/lambda/algorithm.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/tokenizer.hpp>
 
@@ -21,8 +18,11 @@
 #define foreach_ BOOST_FOREACH
 
 using namespace boost;
-using namespace boost::lambda;
 using namespace std;
+
+typedef tokenizer<char_separator<char>> char_tok;
+typedef char_separator<char> char_sep;
+typedef map<std::string, std::string> strmap;
 
 const long max_session_age = 7 * 24 * 3600;
 
@@ -161,10 +161,10 @@ int64_t get_sid_cookie(const map<string, string>& env)
     auto cookie_it = env.find("HTTP_COOKIE");
     if (cookie_it != env.end())
     {
-        tokenizer<char_separator<char>> tok(cookie_it->second, char_separator<char>(","));
+        char_tok tok(cookie_it->second, char_sep(","));
         foreach_(const string& s, tok)
         {
-            tokenizer<char_separator<char>> tok2(cookie_it->second, char_separator<char>("="));
+            char_tok tok2(cookie_it->second, char_sep("="));
             foreach_(const string& s2, tok2)
             {
                 
@@ -193,12 +193,31 @@ map<string, string> parse_env(char* env[])
     return m;
 }
 
+map<string, string> build_map(const string& s,
+                              const string& pair_delim,
+                              const string& pair_item_delim)
+{
+    map<string, string> m;
+    char_tok tok(s, char_sep(pair_delim.c_str()));
+    foreach_(const string& pair_string, tok)
+    {
+        char_tok tok2(pair_string, char_sep(pair_item_delim.c_str()));
+        vector<string> v(tok2.begin(), tok2.end());
+        if (v.size() > 1) m[v[0]] = v[1];
+    }
+    return m;
+}
+
 int main(int argc, char* argv[], char* envp[])
 {
     //printf("HTTP/1.0 200 OK\nContent-type: text/html\n\n");
-    std::for_each(log_env_vars.begin(), log_env_vars.end(), cout << _1 << "\n");
     printf("Content-type: text/html\n\n");
-    cout << format("test %2% %1%") % "def" % "abc" << endl;
+    cout << format("test %s %s") % "def" % "abc" << endl;
+    strmap m = build_map("abc=2;def=3", ";", "=");
+    foreach_(strmap::value_type p, m)
+    {
+        cout << p.first << " - " << p.second << endl;
+    }
     return 0;
 
     try
