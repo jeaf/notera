@@ -2,8 +2,6 @@
 #include "sqlite3.h"
 
 #include <algorithm>
-#include <cstdio>
-#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <map>
@@ -23,7 +21,6 @@ using namespace std;
 
 typedef tokenizer<char_separator<char>> char_tok;
 typedef char_separator<char> char_sep;
-typedef map<std::string, std::string> strmap;
 
 const long max_session_age = 7 * 24 * 3600;
 
@@ -262,7 +259,8 @@ int main(int argc, char* argv[], char* envp[])
 {
     try
     {
-        auto env = parse_env(envp);
+        auto env          = parse_env(envp);
+        auto query_string = build_map(env["QUERY_STRING"], "&", "=");
 
         // Connect to the DB and create tables
         Sqlite db;
@@ -330,7 +328,7 @@ int main(int argc, char* argv[], char* envp[])
         int64_t sid = get_sid_cookie(env);
 
         // Check if login request
-        if (env["QUERY_STRING"].find("login") != string::npos)
+        if (query_string.find("login") != query_string.end())
         {
             // Read submitted credentials from stdin
             auto content_len_it = env.find("CONTENT_LENGTH");
@@ -341,32 +339,12 @@ int main(int argc, char* argv[], char* envp[])
             char buf[1024] = {0};
             long read_len = fread(buf, 1, content_len, stdin);
             CHECK(read_len == content_len, "Invalid login request, could not read data (read: %d, CONTENT_LENGTH: %d)", read_len, content_len);
-
-            // Find user name
-            char user[1024] = {0};
-            char* user_it = user;
-            char* buf_it = strstr(buf, "username");
-            if (buf_it)
-            {
-                buf_it += strlen("username") + 1;
-                while (*buf_it && *buf_it != '&') *user_it++ = *buf_it++;
-            }
-
-            // Find submitted auth token (hash of username, hashed_pwd, sid)
-            char auth_token[1024] = {0};
-            char* auth_token_it = auth_token;
-            buf_it = strstr(buf, "auth_token");
-            if (buf_it)
-            {
-                buf_it += strlen("auth_token") + 1;
-                while (*buf_it && *buf_it != '&') *auth_token_it++ = *buf_it++;
-            }
+            auto post_data = build_map(buf, "&", "=");
 
             // Construct the expected auth token
-            //char exp_token[1024];
-            Sha1 sha(user);
+            Sha1 sha(post_data["username"]);
             std::shared_ptr<Sqlite::Stmt> stmt = db.prepare_v2(
-                fmt("SELECT id,pwd_hash FROM user WHERE name='%s'", user),
+                fmt("SELECT id,pwd_hash FROM user WHERE name='%s'", post_data["username"]),
                 -1, 0);
             int rc = stmt->step();
             string hash_pwd;
@@ -381,11 +359,10 @@ int main(int argc, char* argv[], char* envp[])
             sha.update(sid_str);
             sha.result();
             unsigned int* s = sha.Message_Digest;
-            char expected_auth_token[1024] = {0};
-            sprintf(expected_auth_token, "%02x%02x%02x%02x%02x", s[0], s[1], s[2], s[3], s[4]);
+            string expected_auth_token = fmt("%02x%02x%02x%02x%02x", s[0], s[1], s[2], s[3], s[4]);
 
             // Compare the expected auth token to the submitted one
-            if (strcmp(expected_auth_token, auth_token) == 0)
+            if (expected_auth_token == post_data["auth_token"])
             {
                 // User is authenticated, store the session
                 db.exec(fmt("INSERT INTO session(id, user_id) VALUES(%ld, %lld)", sid, user_id), NULL, NULL, NULL);
@@ -394,7 +371,8 @@ int main(int argc, char* argv[], char* envp[])
             }
             else
             {
-                resp_tpl(fmt("<p>Login FAIL, user: %s, pwd_hash: %s, tok: %s, sid: %s</p>", user, hash_pwd, sid_str, auth_token));
+                resp_tpl(fmt("<p>Login FAIL, user: %s, pwd_hash: %s, tok: %s, sid: %s</p>",
+                         post_data["user"], hash_pwd, sid_str, post_data["auth_token"]));
             }
 
             return 0;
