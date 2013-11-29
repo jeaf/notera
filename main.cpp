@@ -27,19 +27,19 @@ typedef map<std::string, std::string> strmap;
 
 const long max_session_age = 7 * 24 * 3600;
 
-string fmt_impl(const format& f) {return str(f);}
+string fmt(const format& f) {return str(f);}
 
 template <typename T, typename... Ts>
-string fmt_impl(format& f, const T& arg, Ts... args)
+string fmt(format& f, const T& arg, Ts... args)
 {
-    return fmt_impl(f % arg, args...);
+    return fmt(f % arg, args...);
 }
 
-template <typename T, typename... Ts>
-string fmt(const string& s, const T& arg, Ts... args)
+template <typename... Ts>
+string fmt(const string& s, Ts... args)
 {
     format f(s);
-    return fmt_impl(f % arg, args...);
+    return fmt(f, args...);
 }
 
 vector<string> log_env_vars{"CONTENT_LENGTH",
@@ -69,15 +69,10 @@ vector<string> log_env_vars{"CONTENT_LENGTH",
                             "SERVER_PORT",
                             "SERVER_SOFTWARE"};
 
-void error(const char* msg, const char* file, const char* func, long line, ...)
+template <typename... Ts>
+void error(const char* msg, const char* file, const char* func, long line, Ts... args)
 {
-    va_list args;
-    va_start(args, line);
-    char buf[2048];
-    vsprintf(buf, msg, args);
-    ostringstream oss;
-    oss << buf << " [" << file << "!" << func << ":" << line << "]";
-    throw runtime_error(oss.str());
+    throw runtime_error(fmt("%1% [%2%!%3%:%4%]", fmt(msg, args...), file, func, line));
 }
 
 class Cookie
@@ -87,7 +82,7 @@ public:
         : name_(name), value_(value), max_age_(max_age) {}
     string get_header() const
     {
-        return str(format("Set-Cookie: %s=%s; Max-Age=%ld") % name_ % value_ % max_age_);
+        return fmt("Set-Cookie: %s=%s; Max-Age=%ld", name_, value_, max_age_);
     }
 private:
     string name_;
@@ -142,15 +137,15 @@ public:
     };
 
     Sqlite() : db(NULL) {}
-    void exec(const char* sql_buf, int (*callback)(void*,int,char**,char**), void* arg1, char** error_msg)
+    void exec(const string& sql, int (*callback)(void*,int,char**,char**), void* arg1, char** error_msg)
     {
-        int rc = sqlite3_exec(db, sql_buf, callback, arg1, error_msg);
+        int rc = sqlite3_exec(db, sql.c_str(), callback, arg1, error_msg);
         CHECK(rc == SQLITE_OK, "Can't execute: %s (%d)", errmsg(), rc)
     }
-    std::shared_ptr<Stmt> prepare_v2(const char *zSql, int nByte, const char **pzTail)
+    std::shared_ptr<Stmt> prepare_v2(const string& sql, int nByte, const char **pzTail)
     {
         sqlite3_stmt* stmt = NULL;
-        int rc = sqlite3_prepare_v2(db, zSql, nByte, &stmt, pzTail);
+        int rc = sqlite3_prepare_v2(db, sql.c_str(), nByte, &stmt, pzTail);
         CHECK(rc == SQLITE_OK, "Can't prepare statement: %s, (%d)", errmsg(), rc);
         return make_shared<Stmt>(stmt);
     }
@@ -171,7 +166,6 @@ public:
         return stmt->column_int64(0);
     }
     sqlite3* db;
-    char sql[1024];
 };
 
 void add_user(Sqlite& db, const char* username, const char* pwd)
@@ -181,9 +175,9 @@ void add_user(Sqlite& db, const char* username, const char* pwd)
     sha.update(pwd_salt);
     sha.result();
 
-    sprintf(db.sql, "INSERT INTO user(name, pwd_hash) VALUES ('%s', '%02x%02x%02x%02x%02x');", username,
-        sha.Message_Digest[0], sha.Message_Digest[1], sha.Message_Digest[2], sha.Message_Digest[3], sha.Message_Digest[4]);
-    db.exec(db.sql, NULL, NULL, NULL);
+    string s = fmt("INSERT INTO user(name, pwd_hash) VALUES ('%s', '%02x%02x%02x%02x%02x');",
+                   username, sha.Message_Digest[0], sha.Message_Digest[1], sha.Message_Digest[2], sha.Message_Digest[3], sha.Message_Digest[4]);
+    db.exec(s, NULL, NULL, NULL);
 }
 
 int64_t gen_sid(Sqlite& db)
@@ -251,17 +245,17 @@ map<string, string> build_map(const string& s,
     return m;
 }
 
-void response(const string& resp)
+void resp_tpl(const string& resp)
 {
     cout << "Content-type: text/html\n\n";
-    cout << format("<html><head></head><body>%s</body></html>") % resp;
+    cout << fmt("<html><head></head><body>%s</body></html>", resp);
 }
 
-void response(const string& resp, const Cookie& c)
+void resp_tpl(const string& resp, const Cookie& c)
 {
     cout << "Content-type: text/html" << endl;
     cout << c.get_header() << endl << endl;
-    cout << format("<html><head></head><body>%s</body></html>") % resp;
+    cout << fmt("<html><head></head><body>%s</body></html>", resp);
 }
 
 int main(int argc, char* argv[], char* envp[])
@@ -302,7 +296,7 @@ int main(int argc, char* argv[], char* envp[])
         }
         *log_def.rbegin() = ')';
         log_def += ";";
-        db.exec(log_def.c_str(), 0, 0, 0);
+        db.exec(log_def, 0, 0, 0);
 
         // Log the request
         // todo
@@ -323,7 +317,7 @@ int main(int argc, char* argv[], char* envp[])
         }
         *sql_str.rbegin() = ')';
         cout << sql_str << endl;
-        db.exec(sql_str.c_str(), 0, 0, 0);
+        db.exec(sql_str, 0, 0, 0);
 
         // Create a user
         //add_user(db, "abc", "def");
@@ -371,8 +365,9 @@ int main(int argc, char* argv[], char* envp[])
             // Construct the expected auth token
             //char exp_token[1024];
             Sha1 sha(user);
-            sprintf(db.sql, "SELECT id,pwd_hash FROM user WHERE name='%s'", user);
-            std::shared_ptr<Sqlite::Stmt> stmt = db.prepare_v2(db.sql, -1, 0);
+            std::shared_ptr<Sqlite::Stmt> stmt = db.prepare_v2(
+                fmt("SELECT id,pwd_hash FROM user WHERE name='%s'", user),
+                -1, 0);
             int rc = stmt->step();
             string hash_pwd;
             long long user_id = -1;
@@ -393,15 +388,13 @@ int main(int argc, char* argv[], char* envp[])
             if (strcmp(expected_auth_token, auth_token) == 0)
             {
                 // User is authenticated, store the session
-                sprintf(db.sql, "INSERT INTO session(id, user_id) VALUES(%ld, %lld)", sid, user_id);
-                db.exec(db.sql, NULL, NULL, NULL);
-                response("<p>Login successful!</p>");
+                db.exec(fmt("INSERT INTO session(id, user_id) VALUES(%ld, %lld)", sid, user_id), NULL, NULL, NULL);
+                resp_tpl("<p>Login successful!</p>");
                 authenticated = true;
             }
             else
             {
-                response(str(format("<p>Login FAIL, user: %s, pwd_hash: %s, tok: %s, sid: %s</p>")
-                         % user % hash_pwd % sid_str % auth_token));
+                resp_tpl(fmt("<p>Login FAIL, user: %s, pwd_hash: %s, tok: %s, sid: %s</p>", user, hash_pwd, sid_str, auth_token));
             }
 
             return 0;
@@ -410,27 +403,26 @@ int main(int argc, char* argv[], char* envp[])
         // Not a login request, check session
         else
         {
-            sprintf(db.sql, "SELECT (strftime('%%s', 'now') - create_time) as age FROM session WHERE id=%ld", sid);
-            auto stmt = db.prepare_v2(db.sql, -1, 0);
+            auto stmt = db.prepare_v2(fmt("SELECT (strftime('%%s', 'now') - create_time) as age FROM session WHERE id=%ld", sid), -1, 0);
             long age = (stmt->step() == SQLITE_ROW) ? stmt->column_int(0) : max_session_age;
             if (age < max_session_age) authenticated = true;
         }
 
         if (authenticated)
         {
-            response(get_file_contents("app.html"));
+            resp_tpl(get_file_contents("app.html"));
         }
         else
         {
-            response(get_file_contents("login.html"),
-                     Cookie("sid", str(format("%ld") % gen_sid(db)), max_session_age));
+            resp_tpl(get_file_contents("login.html"),
+                     Cookie("sid", fmt("%ld", gen_sid(db)), max_session_age));
         }
 
         return 0;
     }
     catch (const std::exception& ex)
     {
-        response(fmt("<p>An error occurred while generating this page:</p><p>%s</p></body></html>", ex.what()));
+        resp_tpl(fmt("<p>An error occurred while generating this page:</p><p>%s</p></body></html>", ex.what()));
     }
 
     return 1;
