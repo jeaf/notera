@@ -13,7 +13,8 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/tokenizer.hpp>
 
-#define CHECK(cond, msg, ...) if (!(cond)) error(msg, __FILE__, __FUNCTION__, __LINE__, ##__VA_ARGS__);
+#define CHECK(cond, msg, ...) if (!(cond)) error(msg, __FILE__, __FUNCTION__,\
+                                                 __LINE__, ##__VA_ARGS__);
 #define foreach_ BOOST_FOREACH
 
 using namespace boost;
@@ -67,9 +68,11 @@ vector<string> log_env_vars{"CONTENT_LENGTH",
                             "SERVER_SOFTWARE"};
 
 template <typename... Ts>
-void error(const char* msg, const char* file, const char* func, long line, Ts... args)
+void error(const char* msg, const char* file, const char* func, long line,
+           Ts... args)
 {
-    throw runtime_error(fmt("%1% [%2%!%3%:%4%]", fmt(msg, args...), file, func, line));
+    throw runtime_error(fmt("%1% [%2%!%3%:%4%]", fmt(msg, args...), file, func,
+                            line));
 }
 
 class Cookie
@@ -115,7 +118,8 @@ public:
         int step()
         {
             int rc = sqlite3_step(stmt_);
-            CHECK(rc == SQLITE_DONE || rc == SQLITE_ROW, "Error when stepping SQL query: %d", rc)
+            CHECK(rc == SQLITE_DONE || rc == SQLITE_ROW,
+                  "Error when stepping SQL query: %d", rc)
             return rc;
         }
         int column_int(int col)
@@ -128,22 +132,26 @@ public:
         }
         string column_text(int col)
         {
-            return reinterpret_cast<const char*>(sqlite3_column_text(stmt_, col));
+            return reinterpret_cast<const char*>(sqlite3_column_text(stmt_,
+                                                                     col));
         }
         sqlite3_stmt* stmt_;
     };
 
     Sqlite() : db(NULL) {}
-    void exec(const string& sql, int (*callback)(void*,int,char**,char**), void* arg1, char** error_msg)
+    void exec(const string& sql, int (*callback)(void*,int,char**,char**),
+              void* arg1, char** error_msg)
     {
         int rc = sqlite3_exec(db, sql.c_str(), callback, arg1, error_msg);
         CHECK(rc == SQLITE_OK, "Can't execute: %s (%d)", errmsg(), rc)
     }
-    std::shared_ptr<Stmt> prepare_v2(const string& sql, int nByte, const char **pzTail)
+    std::shared_ptr<Stmt> prepare_v2(const string& sql, int nByte,
+                                     const char **pzTail)
     {
         sqlite3_stmt* stmt = NULL;
         int rc = sqlite3_prepare_v2(db, sql.c_str(), nByte, &stmt, pzTail);
-        CHECK(rc == SQLITE_OK, "Can't prepare statement: %s, (%d)", errmsg(), rc);
+        CHECK(rc == SQLITE_OK, "Can't prepare statement: %s, (%d)",
+              errmsg(), rc);
         return make_shared<Stmt>(stmt);
     }
     void open(const char *filename)
@@ -159,7 +167,8 @@ public:
     {
         std::shared_ptr<Stmt> stmt = prepare_v2("select random()", -1, 0);
         int rc = stmt->step();
-        CHECK(rc == SQLITE_ROW, "Could not generate random number: %s (%d)", errmsg(), rc); 
+        CHECK(rc == SQLITE_ROW, "Could not generate random number: %s (%d)",
+              errmsg(), rc); 
         return stmt->column_int64(0);
     }
     sqlite3* db;
@@ -172,8 +181,11 @@ void add_user(Sqlite& db, const char* username, const char* pwd)
     sha.update(pwd_salt);
     sha.result();
 
-    string s = fmt("INSERT INTO user(name, pwd_hash) VALUES ('%s', '%02x%02x%02x%02x%02x');",
-                   username, sha.Message_Digest[0], sha.Message_Digest[1], sha.Message_Digest[2], sha.Message_Digest[3], sha.Message_Digest[4]);
+    string s = fmt("INSERT INTO user(name, pwd_hash) "
+                   "VALUES ('%s', '%02x%02x%02x%02x%02x');",
+                   username, sha.Message_Digest[0], sha.Message_Digest[1],
+                   sha.Message_Digest[2], sha.Message_Digest[3],
+                   sha.Message_Digest[4]);
     db.exec(s, NULL, NULL, NULL);
 }
 
@@ -206,7 +218,8 @@ int64_t get_sid_cookie(const map<string, string>& env)
             auto pos = cookie_it->second.find("sid=");
             if (pos != string::npos)
             {
-                return lexical_cast<int64_t>(cookie_it->second.substr(pos + 4));
+                return lexical_cast<int64_t>(
+                    cookie_it->second.substr(pos + 4));
             }
         }
     }
@@ -265,28 +278,30 @@ int main(int argc, char* argv[], char* envp[])
         // Connect to the DB and create tables
         Sqlite db;
         db.open("db.sqlite3");
-        db.exec("CREATE TABLE IF  NOT EXISTS note("
-                "    id           INTEGER PRIMARY KEY,"
-                "    title        TEXT,"
-                "    content      TEXT);"
-                "CREATE TABLE IF  NOT EXISTS session("
-                "    id           INTEGER PRIMARY KEY,"
-                "    user_id      INTEGER NOT NULL,"
-                "    create_time  INTEGER NOT NULL DEFAULT (strftime('%s', 'now')));"
-                "CREATE TABLE IF  NOT EXISTS user("
-                "    id           INTEGER PRIMARY KEY,"
-                "    name         TEXT NOT NULL UNIQUE,"
-                "    pwd_hash     TEXT NOT NULL);"
-                "CREATE TABLE IF  NOT EXISTS note_user_rel("
-                "    user_id      INTEGER NOT NULL,"
-                "    note_id      INTEGER NOT NULL,"
-                "    PRIMARY KEY(user_id, note_id),"
-                "    FOREIGN KEY(user_id) REFERENCES user(id) ON DELETE CASCADE,"
-                "    FOREIGN KEY(note_id) REFERENCES note(id) ON DELETE CASCADE);",
-                0, 0, 0);
-        string log_def("CREATE TABLE IF NOT EXISTS log("
-                       "    id           INTEGER PRIMARY KEY,"
-                       "    time         INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),");
+        db.exec(
+        "CREATE TABLE IF  NOT EXISTS note("
+        "    id           INTEGER PRIMARY KEY,"
+        "    title        TEXT,"
+        "    content      TEXT);"
+        "CREATE TABLE IF  NOT EXISTS session("
+        "    id           INTEGER PRIMARY KEY,"
+        "    user_id      INTEGER NOT NULL,"
+        "    create_time  INTEGER NOT NULL DEFAULT (strftime('%s', 'now')));"
+        "CREATE TABLE IF  NOT EXISTS user("
+        "    id           INTEGER PRIMARY KEY,"
+        "    name         TEXT NOT NULL UNIQUE,"
+        "    pwd_hash     TEXT NOT NULL);"
+        "CREATE TABLE IF  NOT EXISTS note_user_rel("
+        "    user_id      INTEGER NOT NULL,"
+        "    note_id      INTEGER NOT NULL,"
+        "    PRIMARY KEY(user_id, note_id),"
+        "    FOREIGN KEY(user_id) REFERENCES user(id) ON DELETE CASCADE,"
+        "    FOREIGN KEY(note_id) REFERENCES note(id) ON DELETE CASCADE);",
+        0, 0, 0);
+        string log_def(
+        "CREATE TABLE IF NOT EXISTS log("
+        "    id           INTEGER PRIMARY KEY,"
+        "    time         INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),");
         foreach_(const string& s, log_env_vars)
         {
             log_def += s;
@@ -332,20 +347,27 @@ int main(int argc, char* argv[], char* envp[])
         {
             // Read submitted credentials from stdin
             auto content_len_it = env.find("CONTENT_LENGTH");
-            CHECK(content_len_it != env.end(), "Invalid login request, no CONTENT_LENGTH defined.");
+            CHECK(content_len_it != env.end(),
+                  "Invalid login request, no CONTENT_LENGTH defined.");
             long content_len = lexical_cast<long>(content_len_it->second);
-            CHECK(content_len > 0, "Invalid login request, unexpected CONTENT_LENGTH: %d", content_len);
-            CHECK(content_len < 1024, "Invalid login request, CONTENT_LENGTH too large: %d", content_len);
+            CHECK(content_len > 0,
+                  "Invalid login request, unexpected CONTENT_LENGTH: %d",
+                  content_len);
+            CHECK(content_len < 1024,
+                  "Invalid login request, CONTENT_LENGTH too large: %d",
+                  content_len);
             char buf[1024] = {0};
             long read_len = fread(buf, 1, content_len, stdin);
-            CHECK(read_len == content_len, "Invalid login request, could not read data (read: %d, CONTENT_LENGTH: %d)", read_len, content_len);
+            CHECK(read_len == content_len,
+                  "Invalid login request, could not read data "
+                  "(read: %d, CONTENT_LENGTH: %d)", read_len, content_len);
             auto post_data = build_map(buf, "&", "=");
 
             // Construct the expected auth token
             Sha1 sha(post_data["username"]);
             std::shared_ptr<Sqlite::Stmt> stmt = db.prepare_v2(
-                fmt("SELECT id,pwd_hash FROM user WHERE name='%s'", post_data["username"]),
-                -1, 0);
+                fmt("SELECT id,pwd_hash FROM user WHERE name='%s'",
+                    post_data["username"]), -1, 0);
             int rc = stmt->step();
             string hash_pwd;
             long long user_id = -1;
@@ -359,20 +381,24 @@ int main(int argc, char* argv[], char* envp[])
             sha.update(sid_str);
             sha.result();
             unsigned int* s = sha.Message_Digest;
-            string expected_auth_token = fmt("%02x%02x%02x%02x%02x", s[0], s[1], s[2], s[3], s[4]);
+            string expected_auth_token = fmt("%02x%02x%02x%02x%02x", s[0],
+                                             s[1], s[2], s[3], s[4]);
 
             // Compare the expected auth token to the submitted one
             if (expected_auth_token == post_data["auth_token"])
             {
                 // User is authenticated, store the session
-                db.exec(fmt("INSERT INTO session(id, user_id) VALUES(%ld, %lld)", sid, user_id), NULL, NULL, NULL);
+                db.exec(fmt("INSERT INTO session(id, user_id) "
+                            "VALUES(%ld, %lld)", sid, user_id), NULL, NULL,
+                            NULL);
                 resp_tpl("<p>Login successful!</p>");
                 authenticated = true;
             }
             else
             {
-                resp_tpl(fmt("<p>Login FAIL, user: %s, pwd_hash: %s, tok: %s, sid: %s</p>",
-                         post_data["user"], hash_pwd, sid_str, post_data["auth_token"]));
+                resp_tpl(fmt("<p>Login FAIL, user: %s, pwd_hash: %s, tok: %s, "
+                             "sid: %s</p>", post_data["user"], hash_pwd,
+                             sid_str, post_data["auth_token"]));
             }
 
             return 0;
@@ -381,8 +407,11 @@ int main(int argc, char* argv[], char* envp[])
         // Not a login request, check session
         else
         {
-            auto stmt = db.prepare_v2(fmt("SELECT (strftime('%%s', 'now') - create_time) as age FROM session WHERE id=%ld", sid), -1, 0);
-            long age = (stmt->step() == SQLITE_ROW) ? stmt->column_int(0) : max_session_age;
+            auto stmt = db.prepare_v2(
+                fmt("SELECT (strftime('%%s', 'now') - create_time) "
+                    "as age FROM session WHERE id=%ld", sid), -1, 0);
+            long age = (stmt->step() == SQLITE_ROW) ?
+                        stmt->column_int(0) : max_session_age;
             if (age < max_session_age) authenticated = true;
         }
 
@@ -400,7 +429,8 @@ int main(int argc, char* argv[], char* envp[])
     }
     catch (const std::exception& ex)
     {
-        resp_tpl(fmt("<p>An error occurred while generating this page:</p><p>%s</p></body></html>", ex.what()));
+        resp_tpl(fmt("<p>An error occurred while generating this page:"
+                     "</p><p>%s</p></body></html>", ex.what()));
     }
 
     return 1;
