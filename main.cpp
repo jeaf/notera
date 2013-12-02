@@ -1,5 +1,6 @@
 #include "sha1.h"
-#include "sqlite3.h"
+#include "sqlite_wrapper.h"
+#include "util.h"
 
 #include <algorithm>
 #include <fstream>
@@ -9,12 +10,9 @@
 #include <sstream>
 
 #include <boost/foreach.hpp>
-#include <boost/format.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/tokenizer.hpp>
 
-#define CHECK(cond, msg, ...) if (!(cond)) error(msg, __FILE__, __FUNCTION__,\
-                                                 __LINE__, ##__VA_ARGS__);
 #define foreach_ BOOST_FOREACH
 
 using namespace boost;
@@ -24,21 +22,6 @@ typedef tokenizer<char_separator<char>> char_tok;
 typedef char_separator<char> char_sep;
 
 const long max_session_age = 7 * 24 * 3600;
-
-string fmt(const format& f) {return str(f);}
-
-template <typename T, typename... Ts>
-string fmt(format& f, const T& arg, Ts... args)
-{
-    return fmt(f % arg, args...);
-}
-
-template <typename... Ts>
-string fmt(const string& s, Ts... args)
-{
-    format f(s);
-    return fmt(f, args...);
-}
 
 vector<string> log_env_vars{"CONTENT_LENGTH",
                             "CONTENT_TYPE",
@@ -67,14 +50,6 @@ vector<string> log_env_vars{"CONTENT_LENGTH",
                             "SERVER_PORT",
                             "SERVER_SOFTWARE"};
 
-template <typename... Ts>
-void error(const char* msg, const char* file, const char* func, long line,
-           Ts... args)
-{
-    throw runtime_error(fmt("%1% [%2%!%3%:%4%]", fmt(msg, args...), file, func,
-                            line));
-}
-
 class Cookie
 {
 public:
@@ -93,7 +68,7 @@ private:
 string get_file_contents(const char* filename)
 {
     ifstream in(filename, ios::in | ios::binary);
-    CHECK(in, "Count not read file %s, error: %d", filename, errno);
+    CHECK(in, "Count not read file %s, error: %d", filename, errno)
     string contents;
     in.seekg(0, std::ios::end);
     contents.resize(in.tellg());
@@ -101,78 +76,6 @@ string get_file_contents(const char* filename)
     in.read(&contents[0], contents.size());
     return contents;
 }
-
-class Sqlite
-{
-public:
-    class Stmt
-    {
-    public:
-        Stmt(sqlite3_stmt* stmt) : stmt_(stmt)
-        {
-        }
-        ~Stmt()
-        {
-            sqlite3_finalize(stmt_);
-        }
-        int step()
-        {
-            int rc = sqlite3_step(stmt_);
-            CHECK(rc == SQLITE_DONE || rc == SQLITE_ROW,
-                  "Error when stepping SQL query: %d", rc)
-            return rc;
-        }
-        int column_int(int col)
-        {
-            return sqlite3_column_int(stmt_, col);
-        }
-        int64_t column_int64(int col)
-        {
-            return sqlite3_column_int64(stmt_, col);
-        }
-        string column_text(int col)
-        {
-            return reinterpret_cast<const char*>(sqlite3_column_text(stmt_,
-                                                                     col));
-        }
-        sqlite3_stmt* stmt_;
-    };
-
-    Sqlite() : db(NULL) {}
-    void exec(const string& sql, int (*callback)(void*,int,char**,char**),
-              void* arg1, char** error_msg)
-    {
-        int rc = sqlite3_exec(db, sql.c_str(), callback, arg1, error_msg);
-        CHECK(rc == SQLITE_OK, "Can't execute: %s (%d)", errmsg(), rc)
-    }
-    std::shared_ptr<Stmt> prepare_v2(const string& sql, int nByte,
-                                     const char **pzTail)
-    {
-        sqlite3_stmt* stmt = NULL;
-        int rc = sqlite3_prepare_v2(db, sql.c_str(), nByte, &stmt, pzTail);
-        CHECK(rc == SQLITE_OK, "Can't prepare statement: %s, (%d)",
-              errmsg(), rc);
-        return make_shared<Stmt>(stmt);
-    }
-    void open(const char *filename)
-    {
-        int rc = sqlite3_open(filename, &db);
-        CHECK(!rc, "Can't open database: %s", errmsg())
-    }
-    const char* errmsg()
-    {
-        return sqlite3_errmsg(db);
-    }
-    int64_t random_int64()
-    {
-        std::shared_ptr<Stmt> stmt = prepare_v2("select random()", -1, 0);
-        int rc = stmt->step();
-        CHECK(rc == SQLITE_ROW, "Could not generate random number: %s (%d)",
-              errmsg(), rc); 
-        return stmt->column_int64(0);
-    }
-    sqlite3* db;
-};
 
 void add_user(Sqlite& db, const char* username, const char* pwd)
 {
@@ -233,7 +136,7 @@ map<string, string> parse_env(char* env[])
     {
         string s(*env);
         string::size_type pos = s.find_first_of('=');
-        CHECK(pos != string::npos, "Invalid environment string: %s", *env);
+        CHECK(pos != string::npos, "Invalid environment string: %s", *env)
         m[s.substr(0, pos)] = s.substr(pos + 1);
         ++env;
     }
@@ -348,19 +251,19 @@ int main(int argc, char* argv[], char* envp[])
             // Read submitted credentials from stdin
             auto content_len_it = env.find("CONTENT_LENGTH");
             CHECK(content_len_it != env.end(),
-                  "Invalid login request, no CONTENT_LENGTH defined.");
+                  "Invalid login request, no CONTENT_LENGTH defined.")
             long content_len = lexical_cast<long>(content_len_it->second);
             CHECK(content_len > 0,
                   "Invalid login request, unexpected CONTENT_LENGTH: %d",
-                  content_len);
+                  content_len)
             CHECK(content_len < 1024,
                   "Invalid login request, CONTENT_LENGTH too large: %d",
-                  content_len);
+                  content_len)
             char buf[1024] = {0};
             long read_len = fread(buf, 1, content_len, stdin);
             CHECK(read_len == content_len,
                   "Invalid login request, could not read data "
-                  "(read: %d, CONTENT_LENGTH: %d)", read_len, content_len);
+                  "(read: %d, CONTENT_LENGTH: %d)", read_len, content_len)
             auto post_data = build_map(buf, "&", "=");
 
             // Construct the expected auth token
