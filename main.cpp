@@ -215,25 +215,19 @@ int main(int argc, char* argv[], char* envp[])
         db.exec(log_def, 0, 0, 0);
 
         // Log the request
-        // todo
-        string sql_str("INSERT INTO log(");
+        string sql("INSERT INTO log(");
         foreach_(const string& s, log_env_vars)
         {
-            sql_str += s;
-            sql_str += ",";
+            if (env.find(s) != env.end()) sql += fmt("%1%,", s);
         }
-        *sql_str.rbegin() = ')';
-        sql_str += " VALUES(";
+        *sql.rbegin() = ')';
+        sql += " VALUES(";
         foreach_(const string& s, log_env_vars)
         {
-            sql_str += "'";
-            sql_str += env[s];
-            sql_str += "'";
-            sql_str += ",";
+            if (env.find(s) != env.end()) sql += fmt("'%1%',", env[s]);
         }
-        *sql_str.rbegin() = ')';
-        cout << sql_str << endl;
-        db.exec(sql_str, 0, 0, 0);
+        *sql.rbegin() = ')';
+        db.exec(sql, 0, 0, 0);
 
         // Create a user
         //add_user(db, "abc", "def");
@@ -280,7 +274,7 @@ int main(int argc, char* argv[], char* envp[])
                 hash_pwd = stmt->column_text(1);
             }
             sha.update(hash_pwd);
-            string sid_str = lexical_cast<string>(sid);
+            string sid_str = fmt("%1%", sid);
             sha.update(sid_str);
             sha.result();
             unsigned int* s = sha.Message_Digest;
