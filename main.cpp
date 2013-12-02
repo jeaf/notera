@@ -193,23 +193,29 @@ int main(int argc, char* argv[], char* envp[])
         "CREATE TABLE IF  NOT EXISTS user("
         "    id           INTEGER PRIMARY KEY,"
         "    name         TEXT NOT NULL UNIQUE,"
-        "    pwd_hash     TEXT NOT NULL);"
+        "    pwd_hash     TEXT NOT NULL,"
+        "    pwd_salt     TEXT NOT NULL);"
+        "CREATE TABLE IF  NOT EXISTS tag("
+        "    id           INTEGER PRIMARY KEY,"
+        "    name         TEXT NOT NULL);"
         "CREATE TABLE IF  NOT EXISTS note_user_rel("
         "    user_id      INTEGER NOT NULL,"
         "    note_id      INTEGER NOT NULL,"
         "    PRIMARY KEY(user_id, note_id),"
         "    FOREIGN KEY(user_id) REFERENCES user(id) ON DELETE CASCADE,"
+        "    FOREIGN KEY(note_id) REFERENCES note(id) ON DELETE CASCADE);"
+        "CREATE TABLE IF  NOT EXISTS note_tag_rel("
+        "    tag_id       INTEGER NOT NULL,"
+        "    note_id      INTEGER NOT NULL,"
+        "    PRIMARY KEY(tag_id, note_id),"
+        "    FOREIGN KEY(tag_id) REFERENCES tag(id) ON DELETE CASCADE,"
         "    FOREIGN KEY(note_id) REFERENCES note(id) ON DELETE CASCADE);",
         0, 0, 0);
         string log_def(
         "CREATE TABLE IF NOT EXISTS log("
         "    id           INTEGER PRIMARY KEY,"
         "    time         INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),");
-        foreach_(const string& s, log_env_vars)
-        {
-            log_def += s;
-            log_def += " TEXT,";
-        }
+        foreach_(const string& s, log_env_vars) log_def += fmt("%1% TEXT,", s);
         *log_def.rbegin() = ')';
         log_def += ";";
         db.exec(log_def, 0, 0, 0);
@@ -246,6 +252,8 @@ int main(int argc, char* argv[], char* envp[])
             auto content_len_it = env.find("CONTENT_LENGTH");
             CHECK(content_len_it != env.end(),
                   "Invalid login request, no CONTENT_LENGTH defined.")
+            CHECK(!content_len_it->second.empty(),
+                  "Invalid login request, CONTENT_LENGTH is empty.");
             long content_len = lexical_cast<long>(content_len_it->second);
             CHECK(content_len > 0,
                   "Invalid login request, unexpected CONTENT_LENGTH: %d",
