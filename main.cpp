@@ -50,22 +50,7 @@ vector<string> log_env_vars{"CONTENT_LENGTH",
                             "SERVER_PORT",
                             "SERVER_SOFTWARE"};
 
-class Cookie
-{
-public:
-    Cookie(const string& name, const string& value, long max_age)
-        : name_(name), value_(value), max_age_(max_age) {}
-    string get_header() const
-    {
-        return fmt("Set-Cookie: %s=%s; Max-Age=%ld", name_, value_, max_age_);
-    }
-private:
-    string name_;
-    string value_;
-    long   max_age_;
-};
-
-string get_file_contents(const char* filename)
+string get_file_contents(const string& filename)
 {
     ifstream in(filename, ios::in | ios::binary);
     CHECK(in, "Count not read file %s, error: %d", filename, errno)
@@ -134,21 +119,53 @@ map<string, string> build_map(const string& s,
     return m;
 }
 
-void resp_tpl(const string& resp)
+class Resp
 {
-    cout << "Content-type: text/html\n\n";
-    cout << fmt("<html><head></head><body>%s</body></html>", resp);
-}
+public:
+    void set_cookie(const string& name, const string& value, long max_age)
+    {
+        headers.push_back(fmt("Set-Cookie: %1%=%2%; Max-Age=%3%",
+                              name, value, max_age));
+    }
 
-void resp_tpl(const string& resp, const Cookie& c)
-{
-    cout << "Content-type: text/html" << endl;
-    cout << c.get_header() << endl << endl;
-    cout << fmt("<html><head></head><body>%s</body></html>", resp);
-}
+    template <typename... Ts>
+    void tpl(const string& name, Ts... args)
+    {
+        format(get_file_contents(name + ".tpl"), args...);
+    }
+
+    template <typename... Ts>
+    void format(const string& fmt_string, Ts... args)
+    {
+        content_type = "text/html";
+        content      = fmt(fmt_string, args...);
+    }
+
+    //void json(tbd)
+    //{
+    //    content_type = "application/json";
+    //    content      = TBD
+    //}
+
+    void emit()
+    {
+        CHECK(!content_type.empty(), "Empty content_type");
+        CHECK(!content.empty(), "Empty content");
+        cout << "Content-type: " << content_type << endl;
+        foreach_(const auto& h, headers) cout << h << endl;
+        cout << endl << content << endl;
+    }
+
+private:
+    string         content_type;
+    vector<string> headers;
+    string         content;
+};
 
 int main(int argc, char* argv[], char* envp[])
 {
+    Resp resp;
+
     try
     {
         auto env          = parse_env(envp);
@@ -274,14 +291,13 @@ int main(int argc, char* argv[], char* envp[])
                 db.exec(fmt("INSERT INTO session(id, user_id) "
                             "VALUES(%ld, %lld)", sid, user_id), NULL, NULL,
                             NULL);
-                resp_tpl("<p>Login successful!</p>");
+                resp.tpl("app");
                 authenticated = true;
             }
             else
             {
-                resp_tpl(fmt("<p>Login FAIL, user: %s, pwd_hash: %s, tok: %s, "
-                             "sid: %s</p>", post_data["user"], pwd_hash,
-                             sid_str, post_data["auth_token"]));
+                resp.set_cookie("sid", fmt("%1%", gen_sid(db)), max_session_age);
+                resp.tpl("login");
             }
 
             return 0;
@@ -300,22 +316,29 @@ int main(int argc, char* argv[], char* envp[])
 
         if (authenticated)
         {
-            resp_tpl(get_file_contents("app.html"));
+            resp.tpl("app");
         }
         else
         {
-            resp_tpl(get_file_contents("login.html"),
-                     Cookie("sid", fmt("%ld", gen_sid(db)), max_session_age));
+            resp.set_cookie("sid", fmt("%1%", gen_sid(db)), max_session_age);
+            resp.tpl("login");
         }
-
-        return 0;
     }
     catch (const std::exception& ex)
     {
-        resp_tpl(fmt("<p>An error occurred while generating this page:"
-                     "</p><p>%s</p></body></html>", ex.what()));
+        try
+        {
+            resp.tpl("error", ex.what());
+        }
+        catch (const std::exception& ex2)
+        {
+            resp.format("<html><head></head><body><p>Fail to load error template,"
+                        " error: %1%</p><p>Original error: %2%</p></body></html>",
+                        ex2.what(), ex.what());
+        }
     }
 
-    return 1;
+    resp.emit();
+    return 0;
 }
 
