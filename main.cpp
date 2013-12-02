@@ -105,30 +105,6 @@ int64_t gen_sid(Sqlite& db)
     return sid;
 }
 
-int64_t get_sid_cookie(const map<string, string>& env)
-{
-    auto cookie_it = env.find("HTTP_COOKIE");
-    if (cookie_it != env.end())
-    {
-        char_tok tok(cookie_it->second, char_sep(","));
-        foreach_(const string& s, tok)
-        {
-            char_tok tok2(cookie_it->second, char_sep("="));
-            foreach_(const string& s2, tok2)
-            {
-                
-            }
-            auto pos = cookie_it->second.find("sid=");
-            if (pos != string::npos)
-            {
-                return lexical_cast<int64_t>(
-                    cookie_it->second.substr(pos + 4));
-            }
-        }
-    }
-    return 0;
-}
-
 map<string, string> parse_env(char* env[])
 {
     map<string, string> m;
@@ -177,6 +153,7 @@ int main(int argc, char* argv[], char* envp[])
     {
         auto env          = parse_env(envp);
         auto query_string = build_map(env["QUERY_STRING"], "&", "=");
+        auto cookies      = build_map(env["HTTP_COOKIE"] , ",", "=");
 
         // Connect to the DB and create tables
         Sqlite db;
@@ -243,7 +220,8 @@ int main(int argc, char* argv[], char* envp[])
         bool authenticated = false;
 
         // Retrieve the submitted sid
-        int64_t sid = get_sid_cookie(env);
+        int64_t sid = 0;
+        try {sid = lexical_cast<int64_t>(cookies["sid"]);} catch (...) {}
 
         // Check if login request
         if (query_string.find("login") != query_string.end())
@@ -274,14 +252,14 @@ int main(int argc, char* argv[], char* envp[])
                 fmt("SELECT id,pwd_hash FROM user WHERE name='%s'",
                     post_data["username"]), -1, 0);
             int rc = stmt->step();
-            string hash_pwd;
+            string pwd_hash;
             long long user_id = -1;
             if (rc == SQLITE_ROW)
             {
                 user_id = stmt->column_int64(0);
-                hash_pwd = stmt->column_text(1);
+                pwd_hash = stmt->column_text(1);
             }
-            sha.update(hash_pwd);
+            sha.update(pwd_hash);
             string sid_str = fmt("%1%", sid);
             sha.update(sid_str);
             sha.result();
@@ -302,7 +280,7 @@ int main(int argc, char* argv[], char* envp[])
             else
             {
                 resp_tpl(fmt("<p>Login FAIL, user: %s, pwd_hash: %s, tok: %s, "
-                             "sid: %s</p>", post_data["user"], hash_pwd,
+                             "sid: %s</p>", post_data["user"], pwd_hash,
                              sid_str, post_data["auth_token"]));
             }
 
