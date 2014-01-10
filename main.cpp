@@ -3,9 +3,6 @@
 #include "util.h"
 
 #include <algorithm>
-#include <cerrno>
-#include <cstring>
-#include <fstream>
 #include <iostream>
 #include <map>
 #include <memory>
@@ -51,19 +48,6 @@ vector<string> log_env_vars{"CONTENT_LENGTH",
                             "SERVER_NAME",
                             "SERVER_PORT",
                             "SERVER_SOFTWARE"};
-
-string get_file_contents(const string& filename)
-{
-    ifstream in(filename, ios::in | ios::binary);
-    CHECK(in, "Count not read file %s, error: %s (%d)",
-          filename, strerror(errno), errno);
-    string contents;
-    in.seekg(0, std::ios::end);
-    contents.resize(in.tellg());
-    in.seekg(0, std::ios::beg);
-    in.read(&contents[0], contents.size());
-    return contents;
-}
 
 void add_user(Sqlite& db, const char* username, const char* pwd)
 {

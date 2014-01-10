@@ -30,5 +30,7 @@ void error(const char* msg, const char* file, const char* func, long line, Ts...
                              file, func, line));
 }
 
+std::string get_file_contents(const std::string& filename);
+
 #endif
 
