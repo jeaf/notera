@@ -3,6 +3,8 @@
 #include "util.h"
 
 #include <algorithm>
+#include <cerrno>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <map>
@@ -53,7 +55,8 @@ vector<string> log_env_vars{"CONTENT_LENGTH",
 string get_file_contents(const string& filename)
 {
     ifstream in(filename, ios::in | ios::binary);
-    CHECK(in, "Count not read file %s, error: %d", filename, errno)
+    CHECK(in, "Count not read file %s, error: %s (%d)",
+          filename, strerror(errno), errno);
     string contents;
     in.seekg(0, std::ios::end);
     contents.resize(in.tellg());
