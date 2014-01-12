@@ -17,11 +17,12 @@
         </script>
     </head>
     <body>
-        <form name="login_form" action="main.exe?login=1" method="post">
+        <form name="login_form" action="main.exe?submit_login=1" method="post">
             Username: <input type="text"     name="username"><br/>
             Password: <input type="password" name="auth_token"><br/>
             <input type="button" value="Login" onClick="submit_login()" />
         </form>
+        <a href="main.exe?page=new_account">Create new account</a>
         <script src="http://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
         <script src="http://cdnjs.cloudflare.com/ajax/libs/jquery-cookie/1.3.1/jquery.cookie.min.js"></script>
         <script src="http://crypto-js.googlecode.com/svn/tags/3.1.2/build/rollups/sha1.js"></script>

@@ -240,11 +240,22 @@ int main(int argc, char* argv[], char* envp[])
                 CHECK(false, "Invalid API call: %1%", api_call_it->second);
             }
         }
+        
+        // Process new account page request
+        else if (query_string["page"] == "new_account")
+        {
+            resp.tpl("new_account");
+        }
+
+        // Process new account submission
+        else if (query_string.find("submit_new_account") != query_string.end())
+        {
+        }
 
         // Check if login request
         else
         {
-            if (query_string.find("login") != query_string.end())
+            if (query_string.find("submit_login") != query_string.end())
             {
                 // Read submitted credentials from stdin
                 auto content_len_it = env.find("CONTENT_LENGTH");
