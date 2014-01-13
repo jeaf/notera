@@ -115,38 +115,23 @@ public:
                               name, value, max_age));
     }
 
-    template <typename... Ts>
-    void tpl(const string& name, Ts... args)
-    {
-        format(get_file_contents(name + ".tpl"), args...);
-    }
-
-    template <typename... Ts>
-    void format(const string& fmt_string, Ts... args)
-    {
-        content_type = "text/html";
-        content      = fmt(fmt_string, args...);
-    }
-
-    void json(const string& data)
-    {
-        content_type = "application/json";
-        content      = data;
-    }
-
     void emit()
     {
-        CHECK(!content_type.empty(), "Empty content_type");
-        CHECK(!content.empty(), "Empty content");
-        cout << "Content-type: " << content_type << endl;
+        cout << "Content-type: " << "application/json" << endl;
         foreach_(const auto& h, headers) cout << h << endl;
-        cout << endl << content << endl;
+        cout << endl << "{";
+        foreach_(const auto& d, data)
+        {
+            cout << "\"" << d.first << "\": ";
+            cout << "\"" << d.second << "\"" << ", ";
+        }
+        cout << "}" << endl;
     }
 
+    map<string, string> data;
+
 private:
-    string         content_type;
-    vector<string> headers;
-    string         content;
+    vector<string>      headers;
 };
 
 int main(int argc, char* argv[], char* envp[])
@@ -155,6 +140,7 @@ int main(int argc, char* argv[], char* envp[])
 
     try
     {
+        // Parse the request's data
         auto env          = parse_env(envp);
         auto query_string = build_map(env["QUERY_STRING"], "&", "=");
         auto cookies      = build_map(env["HTTP_COOKIE"] , ",", "=");
@@ -174,8 +160,9 @@ int main(int argc, char* argv[], char* envp[])
         "CREATE TABLE IF  NOT EXISTS user("
         "    id           INTEGER PRIMARY KEY,"
         "    name         TEXT NOT NULL UNIQUE,"
-        "    pwd_hash     TEXT NOT NULL,"
-        "    pwd_salt     TEXT NOT NULL);"
+        "    full_name    TEXT,"
+        "    pwd_hash     TEXT,"
+        "    pwd_salt     TEXT NOT NULL DEFAULT (RANDOM()));"
         "CREATE TABLE IF  NOT EXISTS tag("
         "    id           INTEGER PRIMARY KEY,"
         "    name         TEXT NOT NULL);"
@@ -216,42 +203,46 @@ int main(int argc, char* argv[], char* envp[])
         *sql.rbegin() = ')';
         db.exec(sql, 0, 0, 0);
 
-        // Create a user
-        //add_user(db, "abc", "def");
-        //return 0;
-
-        // Assume initially that the user is not authenticated
-        bool authenticated = false;
-
-        // Retrieve the submitted sid
-        int64_t sid = 0;
-        try {sid = lexical_cast<int64_t>(cookies["sid"]);} catch (...) {}
-
-        // Process API calls
-        auto api_call_it = query_string.find("api");
-        if (api_call_it != query_string.end())
+        // Process unauthenticated API calls
+        if (query_string["p2"] == "salt")
         {
-            if (api_call_it->second == "salt")
+            string user_name = query_string["p1"];
+            auto stmt = db.prepare_v2(
+                fmt("SELECT pwd_salt FROM user WHERE name='%1%'", user_name), -1, 0);
+            if (stmt->step() == SQLITE_ROW)
             {
-                resp.json("{\"salt\": 234234234234234}");
+                resp.data["salt"] = stmt->column_text(0);
             }
             else
             {
-                CHECK(false, "Invalid API call: %1%", api_call_it->second);
+                resp.data["error"] = fmt("no such user: %1%", user_name);
             }
         }
+
+        // Check authentication
+        int64_t sid = 0;
+        try {sid = lexical_cast<int64_t>(cookies["sid"]);} catch (...) {}
+        bool authenticated = false;
+        auto stmt = db.prepare_v2(
+            fmt("SELECT (strftime('%%s', 'now') - create_time) "
+                "as age FROM session WHERE id=%ld", sid), -1, 0);
+        long age = (stmt->step() == SQLITE_ROW) ?
+                    stmt->column_int(0) : max_session_age;
+        if (age < max_session_age) authenticated = true;
+        if (authenticated)
+        {
+            //resp.data["auth"] = 1;
+        }
+        else
+        {
+            //resp.data["auth"] = 0;
+        }
+
+        if (query_string["p1"] == "checksession")
+        {
+            resp.data["valid"] = 1;
+        }
         
-        // Process new account page request
-        else if (query_string["page"] == "new_account")
-        {
-            resp.tpl("new_account");
-        }
-
-        // Process new account submission
-        else if (query_string.find("submit_new_account") != query_string.end())
-        {
-        }
-
         // Check if login request
         else
         {
@@ -305,13 +296,11 @@ int main(int argc, char* argv[], char* envp[])
                     db.exec(fmt("INSERT INTO session(id, user_id) "
                                 "VALUES(%ld, %lld)", sid, user_id), NULL, NULL,
                                 NULL);
-                    resp.tpl("app");
                     authenticated = true;
                 }
                 else
                 {
                     resp.set_cookie("sid", fmt("%1%", gen_sid(db)), max_session_age);
-                    resp.tpl("login");
                 }
 
                 return 0;
@@ -330,27 +319,16 @@ int main(int argc, char* argv[], char* envp[])
 
             if (authenticated)
             {
-                resp.tpl("app");
             }
             else
             {
                 resp.set_cookie("sid", fmt("%1%", gen_sid(db)), max_session_age);
-                resp.tpl("login");
             }
         }
     }
     catch (const std::exception& ex)
     {
-        try
-        {
-            resp.tpl("error", ex.what());
-        }
-        catch (const std::exception& ex2)
-        {
-            resp.format("<html><head></head><body><p>Fail to load error template,"
-                        " error: %1%</p><p>Original error: %2%</p></body></html>",
-                        ex2.what(), ex.what());
-        }
+        resp.data["error"] = ex.what();
     }
 
     resp.emit();
