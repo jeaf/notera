@@ -1,12 +1,15 @@
 #ifndef UTIL_H
 #define UTIL_H
 
+#include <boost/foreach.hpp>
 #include <boost/format.hpp>
 #include <stdexcept>
 #include <string>
 
 #define CHECK(cond, msg, ...) if (!(cond)) error(msg, __FILE__, __FUNCTION__,\
                                                  __LINE__, ##__VA_ARGS__);
+
+#define foreach_ BOOST_FOREACH
 
 std::string fmt(const boost::format& f);
 
