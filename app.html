@@ -2,22 +2,18 @@
     <head>
     </head>
     <body>
-        <div id="login">
-            <form name="login_form" action="" method="">
-                Username: <input type="text"     name="username"><br/>
-                Password: <input type="password" name="auth_token"><br/>
+        <div id="div_loading">
+            <p>Loading...</p>
+        </div>
+        <div id="div_login" style="display:none">
+            <form id="form_login">
+                Username: <input id="input_user" type="text"><br/>
+                Password: <input id="input_pwd"  type="password"><br/>
                 <input type="button" value="Login" onClick="submit_login()" />
-            </form>
-            <a href="http://localhost:8000/api.exe?page=new_account">Create new account</a>
-        </div>
-        <div id="new_account">
-            <form name="new_account_form" action="main.exe?submit_new_account=1" method="post">
-                Username: <input type="text"     name="username"><br/>
-                Password: <input type="password" name="pwd_hash"><br/>
-                <input type="button" value="new_account" onClick="submit_new_account()" />
+                <input type="button" value="Create New Account" onClick="submit_new_account()" />
             </form>
         </div>
-        <div id="app">
+        <div id="div_app" style="display:none">
             <p>The App</p>
             <textarea id="text-input" oninput="this.editor.update()"
                       rows="6" cols="60">Type **Markdown** here.</textarea>
@@ -46,38 +42,58 @@
         <script src="http://cdnjs.cloudflare.com/ajax/libs/marked/0.2.9/marked.min.js"></script>
         <script src="http://crypto-js.googlecode.com/svn/tags/3.1.2/build/rollups/sha1.js"></script>
         <script>
-            apiurl = "http://localhost:8000/cgi-bin/api.exe"
+            apiurl = "/cgi-bin/api.exe"
+            sdata  = {}
 
             $(document).ready(function() {
-                // Check if current session is valid
-                $.get(apiurl, {p1: "checksession"}, function(data) {
-                    console.debug(data)
-                })
+                // GET the session
+                $.get(apiurl, {p1: "session"}, function(data) {sdata = data})
 
-                //$("#new_account").hide("drop")
+                // Hide the "loading" div, and show the appropriate div
+                $("#div_loading").hide()
+                if (sdata.auth == "1") {
+                    $("#div_app").show()
+                }
+                else {
+                    $("#input_user").val(sdata.user)
+                    $("#div_login").show()
+                }
             })
 
-            function submit_login() {
-                frm = document.login_form
+            function get_user_salt(user) {
+                // If the user was not registered, we need to PUT the session
+                if (sdata.user == "")
+                {
+                    $.ajax({
+                        url    : apiurl,
+                        type   : "PUT",
+                        data   : {p1: "session", p2: user},
+                        success: function(data) {sdata.salt = data.salt}
+                    })
+                }
+            }
 
-                // Get the salt for the user before doing the login
-                $.get(apiurl, {p1: frm.username.value, p2: "salt"},
-                      function(data) {
-                          frm.auth_token.value = CryptoJS.SHA1(frm.auth_token.value + data.salt)
-                          frm.auth_token.value = CryptoJS.SHA1(frm.username.value + frm.auth_token.value + $.cookie("sid"))
-                          //frm.submit()
-                      });                
+            function submit_login() {
+                get_user_salt($("#input_user").val())
+                token = CryptoJS.SHA1($("#input_pwd").val()+ sdata.salt)
+                token = CryptoJS.SHA1($("#input_user").val() + token + $.cookie("sid"))
+                $.ajax({
+                    url    : apiurl,
+                    type   : "POST",
+                    data   : {p1: "session"},
+                    success: function(data) {}
+                })
             }
 
             function submit_new_account() {
-                frm = document.new_account_form
-
-                // Get the salt for the user before creating the new account
-                $.get("main.exe", {api: "salt", user: frm.username.value},
-                      function(data) {
-                          frm.pwd_hash.value = CryptoJS.SHA1(frm.pwd_hash.value + data.salt)
-                          frm.submit()
-                      });                
+                get_user_salt($("#input_user").val())
+                token = CryptoJS.SHA1($("#input_pwd").val() + sdata.salt)
+                $.ajax({
+                    url    : apiurl + "?p1=user",
+                    type   : "POST",
+                    data   : {pwd_hash: String(token)},
+                    success: function(data) {}
+                })
             }
         </script>
     </body>
