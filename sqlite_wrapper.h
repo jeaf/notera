@@ -29,7 +29,7 @@ public:
               void* arg1, char** error_msg);
     std::shared_ptr<Stmt> prepare_v2(const std::string& sql, int nByte,
                                      const char **pzTail);
-    void open(const char *filename);
+    void open(const std::string& path);
     const char* errmsg();
     int64_t random_int64();
 

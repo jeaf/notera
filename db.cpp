@@ -1,4 +1,7 @@
 #include "db.h"
+#include "util.h"
+
+#include <vector>
 
 using namespace std;
 
@@ -44,28 +47,25 @@ DB::DB(const string& path)
     "    content      TEXT);"
     "CREATE TABLE IF  NOT EXISTS session("
     "    id           INTEGER PRIMARY KEY,"
-    "    user_id      INTEGER NOT NULL,"
+    "    user         TEXT NOT NULL,"
     "    create_time  INTEGER NOT NULL DEFAULT (strftime('%s', 'now')));"
     "CREATE TABLE IF  NOT EXISTS user("
-    "    id           INTEGER PRIMARY KEY,"
-    "    name         TEXT NOT NULL UNIQUE,"
-    "    full_name    TEXT,"
+    "    name         TEXT PRIMARY KEY,"
     "    pwd_hash     TEXT,"
-    "    pwd_salt     TEXT NOT NULL DEFAULT (RANDOM()));"
+    "    salt         TEXT NOT NULL DEFAULT (RANDOM()));"
     "CREATE TABLE IF  NOT EXISTS tag("
-    "    id           INTEGER PRIMARY KEY,"
-    "    name         TEXT NOT NULL);"
+    "    name         TEXT PRIMARY KEY);"
     "CREATE TABLE IF  NOT EXISTS note_user_rel("
-    "    user_id      INTEGER NOT NULL,"
+    "    user_id      TEXT NOT NULL,"
     "    note_id      INTEGER NOT NULL,"
     "    PRIMARY KEY(user_id, note_id),"
-    "    FOREIGN KEY(user_id) REFERENCES user(id) ON DELETE CASCADE,"
+    "    FOREIGN KEY(user_id) REFERENCES user(name) ON DELETE CASCADE,"
     "    FOREIGN KEY(note_id) REFERENCES note(id) ON DELETE CASCADE);"
     "CREATE TABLE IF  NOT EXISTS note_tag_rel("
-    "    tag_id       INTEGER NOT NULL,"
+    "    tag_id       TEXT NOT NULL,"
     "    note_id      INTEGER NOT NULL,"
     "    PRIMARY KEY(tag_id, note_id),"
-    "    FOREIGN KEY(tag_id) REFERENCES tag(id) ON DELETE CASCADE,"
+    "    FOREIGN KEY(tag_id) REFERENCES tag(name) ON DELETE CASCADE,"
     "    FOREIGN KEY(note_id) REFERENCES note(id) ON DELETE CASCADE);",
     0, 0, 0);
     string log_def(
@@ -78,21 +78,28 @@ DB::DB(const string& path)
     db_.exec(log_def, 0, 0, 0);
 }
 
+void DB::exec(const std::string& sql)
+{
+    db_.exec(sql, NULL, NULL, NULL);
+}
+
 shared_ptr<Session> DB::get_session(const map<string, string>& cookies)
 {
     auto s = make_shared<Session>();
+    auto sid_it = cookies.find("sid");
+    const string sid_str = sid_it != cookies.end() ? sid_it->second : "";
 
     bool authenticated = false;
     auto stmt = db_.prepare_v2(
         fmt("SELECT user_id, (strftime('%%s', 'now') - create_time) "
-            "as age FROM session WHERE id=%s", cookies["sid"]), -1, 0);
+            "as age FROM session WHERE id=%s", sid_str), -1, 0);
     string user;
     long age = max_session_age;
     string salt;
     if (stmt->step() == SQLITE_ROW)
     {
         auto stmt2 = db_.prepare_v2(
-            fmt("SELECT name, pwd_salt FROM user WHERE id=%1%",
+            fmt("SELECT name, salt FROM user WHERE id=%1%",
                 stmt->column_int(0)), -1, 0);
         if (stmt2->step() == SQLITE_ROW)
         {
@@ -104,14 +111,34 @@ shared_ptr<Session> DB::get_session(const map<string, string>& cookies)
     if (age < max_session_age) authenticated = true;
 
     s->user = user;
-    s->salt = salt;
     return s;
 }
 
 void DB::insert_session(const map<string, string>& cookies, const string& user)
 {
-    db_.exec(fmt("INSERT INTO session(id, user_id) "
-                 "VALUES(%ld, %lld)", sid, user_id), NULL, NULL, NULL);
+    auto sid_it = cookies.find("sid");
+    CHECK(sid_it != cookies.end(), "sid cookie not defined.");
+    exec(fmt("INSERT INTO session(id, user_id) VALUES(%1%, %2%)",
+         sid_it->second, user));
+}
+
+shared_ptr<User> DB::get_user(const string& name)
+{
+    shared_ptr<User> u;
+    auto stmt = db_.prepare_v2(
+        fmt("SELECT salt FROM user WHERE name=%1%", name), -1, 0);
+    if (stmt->step() == SQLITE_ROW)
+    {
+        u.reset(new User);
+        u->salt = stmt->column_text(0);
+    }
+    return u;
+}
+
+shared_ptr<User> DB::insert_user(const string& name)
+{
+    exec(fmt("INSERT INTO user(name) VALUES(%1%)", name));
+    return get_user(name);
 }
 
 void DB::log(const map<string, string>& env)
@@ -125,9 +152,15 @@ void DB::log(const map<string, string>& env)
     sql += " VALUES(";
     foreach_(const string& s, log_env_vars)
     {
-        if (env.find(s) != env.end()) sql += fmt("'%1%',", env[s]);
+        auto it = env.find(s);
+        if (it != env.end()) sql += fmt("'%1%',", it->second);
     }
     *sql.rbegin() = ')';
     db_.exec(sql, 0, 0, 0);
+}
+
+int64_t DB::random_int64()
+{
+    return db_.random_int64();
 }
 

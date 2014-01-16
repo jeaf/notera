@@ -60,9 +60,9 @@ std::shared_ptr<Sqlite::Stmt> Sqlite::prepare_v2(const string& sql, int nByte,
     return make_shared<Stmt>(stmt);
 }
 
-void Sqlite::open(const char *filename)
+void Sqlite::open(const string& path)
 {
-    int rc = sqlite3_open(filename, &db);
+    int rc = sqlite3_open(path.c_str(), &db);
     CHECK(!rc, "Can't open database: %s", errmsg())
 }
 

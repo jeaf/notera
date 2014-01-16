@@ -28,6 +28,7 @@
 //             Returned values:
 //                 - error: "" if the call was successful, otherwise error msg.
 
+#include "db.h"
 #include "sha1.h"
 #include "sqlite_wrapper.h"
 #include "util.h"
@@ -49,22 +50,22 @@ typedef char_separator<char> char_sep;
 
 const long max_session_age = 7 * 24 * 3600;
 
-void add_user(Sqlite& db, const char* username, const char* pwd)
-{
-    const char* pwd_salt = "1kmalspdlf09sDFSDF";
-    Sha1 sha(pwd);
-    sha.update(pwd_salt);
-    sha.result();
+//void add_user(DB& db, const char* username, const char* pwd)
+//{
+//    const char* pwd_salt = "1kmalspdlf09sDFSDF";
+//    Sha1 sha(pwd);
+//    sha.update(pwd_salt);
+//    sha.result();
+//
+//    string s = fmt("INSERT INTO user(name, pwd_hash) "
+//                   "VALUES ('%s', '%02x%02x%02x%02x%02x');",
+//                   username, sha.Message_Digest[0], sha.Message_Digest[1],
+//                   sha.Message_Digest[2], sha.Message_Digest[3],
+//                   sha.Message_Digest[4]);
+//    db.exec(s);
+//}
 
-    string s = fmt("INSERT INTO user(name, pwd_hash) "
-                   "VALUES ('%s', '%02x%02x%02x%02x%02x');",
-                   username, sha.Message_Digest[0], sha.Message_Digest[1],
-                   sha.Message_Digest[2], sha.Message_Digest[3],
-                   sha.Message_Digest[4]);
-    db.exec(s, NULL, NULL, NULL);
-}
-
-int64_t gen_sid(Sqlite& db)
+int64_t gen_sid(DB& db)
 {
     int64_t sid = db.random_int64();
     if (sid < 0)
@@ -134,6 +135,23 @@ private:
     vector<string>      headers;
 };
 
+map<string, string> parse_post(const map<string, string>& env)
+{
+    map<string, string> post_data;
+
+    auto content_len_it = env.find("CONTENT_LENGTH");
+    if (content_len_it != env.end() && !content_len_it->second.empty())
+    {
+        long content_len = lexical_cast<long>(content_len_it->second);
+        string buf;
+        buf.resize(content_len);
+        long read_len = fread(&buf[0], 1, content_len, stdin);
+        post_data = build_map(buf, "&", "=");
+    }
+
+    return post_data;
+}
+
 int main(int argc, char* argv[], char* envp[])
 {
     Resp resp;
@@ -142,6 +160,7 @@ int main(int argc, char* argv[], char* envp[])
     {
         // Parse the request's data
         auto env          = parse_env(envp);
+        auto post_data    = parse_post(env);
         auto query_string = build_map(env["QUERY_STRING"], "&", "=");
         auto cookies      = build_map(env["HTTP_COOKIE"] , ",", "=");
 
@@ -157,14 +176,50 @@ int main(int argc, char* argv[], char* envp[])
         {
             if (env["REQUEST_METHOD"] == "GET")
             {
-                resp.data["user"] = user;
-                resp.data["salt"] = salt;
+                resp.data["user"] = ses->user;
+                resp.data["auth"] = ses->auth;
+                auto u = db.get_user(ses->user);
+                if (u)
+                {
+                    resp.data["salt"] = u->salt;
+                }
+            }
+            else if (env["REQUEST_METHOD"] == "POST")
+            {
+                // Construct the expected auth token
+                Sha1 sha(ses->user);
+                auto u = db.get_user(ses->user);
+                sha.update(u->pwd_hash);
+                sha.update(cookies["sid"]);
+                sha.result();
+                unsigned int* s = sha.Message_Digest;
+                string expected_auth_token = fmt("%02x%02x%02x%02x%02x", s[0],
+                                                 s[1], s[2], s[3], s[4]);
+
+                // Compare the expected auth token to the submitted one
+                if (expected_auth_token == post_data["token"])
+                {
+                    // User is authenticated, store the session
+                    db.exec(fmt("UPDATE session SET auth=%1% WHERE id=%2%",
+                                1, cookies["sid"]));
+                    resp.data["auth"] = "1";
+                }
+                else
+                {
+                    resp.set_cookie("sid", fmt("%1%", gen_sid(db)), max_session_age);
+                }
             }
             else if (env["REQUEST_METHOD"] == "PUT")
             {
-                CHECK(ses.user == "",
-                      "Session is already linked with user %1%", ses.user);
+                CHECK(ses->user == "",
+                      "Session is already linked with user %1%", ses->user);
+                auto u = db.get_user(query_string["p2"]);
+                if (!u)
+                {
+                    u = db.insert_user(query_string["p2"]);
+                }
                 db.insert_session(cookies, query_string["p2"]);
+                resp.data["salt"] = u->salt;
             }
         }
 
