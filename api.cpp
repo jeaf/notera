@@ -121,10 +121,13 @@ public:
         cout << "Content-type: " << "application/json" << endl;
         foreach_(const auto& h, headers) cout << h << endl;
         cout << endl << "{";
+        long i = data.size();
         foreach_(const auto& d, data)
         {
-            cout << "\"" << d.first << "\": ";
-            cout << "\"" << d.second << "\"" << ", ";
+            cout << "\"" << d.first << "\": " << "\"" << d.second << "\"";
+
+            // Do not output comma if it's the last item
+            if (--i) cout << ", ";
         }
         cout << "}" << endl;
     }
@@ -218,6 +221,7 @@ int main(int argc, char* argv[], char* envp[])
             {
                 CHECK(ses->user == "",
                       "Session is already linked with user %1%", ses->user);
+                CHECK(!query_string["p2"].empty(), "Empty p2 parameter");
                 auto u = db.get_user(query_string["p2"]);
                 if (!u)
                 {
