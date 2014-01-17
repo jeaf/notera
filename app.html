@@ -2,6 +2,15 @@
     <head>
     </head>
     <body>
+        <div id="div_debug">
+            <form id="form_debug">
+                p1: <input id="input_debug_p1" type="text"><br/>
+                p2: <input id="input_debug_p2" type="text"><br/>
+                <input type="button" value="GET" onClick="debug_GET()" />
+                <input type="button" value="PUT" onClick="debug_PUT()" />
+            </form>
+            <p id="debug_output">This p should display the debug output.</p>
+        </div>
         <div id="div_loading">
             <p>Loading...</p>
         </div>
@@ -95,6 +104,32 @@
                     success: function(data) {}
                 })
             }
+
+            function debug_GET() {
+                $.ajax({
+                    url     : apiurl,
+                    type    : "GET",
+                    data    : {p1: $("#input_debug_p1").val()},
+                    dataType: "json",
+                    success : function(data) {
+                        $("#debug_output").html(JSON.stringify(data))
+                    }
+                })
+            }
+
+            function debug_PUT() {
+                $.ajax({
+                    url     : apiurl,
+                    type    : "PUT",
+                    data    : {p1: $("#input_debug_p1").val(),
+                               p2: $("#input_debug_p2").val()},
+                    dataType: "json",
+                    success : function(data) {
+                        $("#debug_output").html(JSON.stringify(data))
+                    }
+                })
+            }
+
         </script>
     </body>
 </html>
