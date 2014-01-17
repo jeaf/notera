@@ -171,13 +171,18 @@ int main(int argc, char* argv[], char* envp[])
         // Load the current session
         auto ses = db.get_session(cookies);
 
+        // Trace some things for debugging purposes
+        resp.data["method"] = env["REQUEST_METHOD"];
+        resp.data["p1"] = query_string["p1"];
+        resp.data["p2"] = query_string["p2"];
+
         // Process API calls
         if (query_string["p1"] == "session")
         {
             if (env["REQUEST_METHOD"] == "GET")
             {
                 resp.data["user"] = ses->user;
-                resp.data["auth"] = ses->auth;
+                resp.data["auth"] = fmt("%1%", ses->auth);
                 auto u = db.get_user(ses->user);
                 if (u)
                 {

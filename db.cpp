@@ -48,6 +48,7 @@ DB::DB(const string& path)
     "CREATE TABLE IF  NOT EXISTS session("
     "    id           INTEGER PRIMARY KEY,"
     "    user         TEXT NOT NULL,"
+    "    auth         INTEGER NOT NULL DEFAULT 0,"
     "    create_time  INTEGER NOT NULL DEFAULT (strftime('%s', 'now')));"
     "CREATE TABLE IF  NOT EXISTS user("
     "    name         TEXT PRIMARY KEY,"
@@ -86,27 +87,28 @@ void DB::exec(const std::string& sql)
 shared_ptr<Session> DB::get_session(const map<string, string>& cookies)
 {
     auto s = make_shared<Session>();
+    s->auth = 0;
     auto sid_it = cookies.find("sid");
     const string sid_str = sid_it != cookies.end() ? sid_it->second : "";
 
     bool authenticated = false;
     auto stmt = db_.prepare_v2(
-        fmt("SELECT user_id, (strftime('%%s', 'now') - create_time) "
-            "as age FROM session WHERE id=%s", sid_str), -1, 0);
+        fmt("SELECT user, auth, (strftime('%%s', 'now') - create_time) "
+            "as age FROM session WHERE id='%s'", sid_str), -1, 0);
     string user;
     long age = max_session_age;
     string salt;
     if (stmt->step() == SQLITE_ROW)
     {
         auto stmt2 = db_.prepare_v2(
-            fmt("SELECT name, salt FROM user WHERE id=%1%",
-                stmt->column_int(0)), -1, 0);
+            fmt("SELECT salt FROM user WHERE name='%1%'",
+                stmt->column_text(0)), -1, 0);
         if (stmt2->step() == SQLITE_ROW)
         {
-            user = stmt2->column_text(0);
-            salt = stmt2->column_text(1);
+            salt = stmt2->column_text(0);
         }
-        age  = stmt->column_int(1);
+        s->auth = stmt->column_int(1);
+        age  = stmt->column_int(2);
     }
     if (age < max_session_age) authenticated = true;
 
@@ -126,7 +128,7 @@ shared_ptr<User> DB::get_user(const string& name)
 {
     shared_ptr<User> u;
     auto stmt = db_.prepare_v2(
-        fmt("SELECT salt FROM user WHERE name=%1%", name), -1, 0);
+        fmt("SELECT salt FROM user WHERE name='%1%'", name), -1, 0);
     if (stmt->step() == SQLITE_ROW)
     {
         u.reset(new User);
