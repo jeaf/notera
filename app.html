@@ -51,7 +51,7 @@
         <script src="http://cdnjs.cloudflare.com/ajax/libs/marked/0.2.9/marked.min.js"></script>
         <script src="http://crypto-js.googlecode.com/svn/tags/3.1.2/build/rollups/sha1.js"></script>
         <script>
-            apiurl = "/cgi-bin/api.exe"
+            apiurl = "cgi-bin/api.exe"
             sdata  = {}
 
             $(document).ready(function() {
@@ -110,7 +110,7 @@
                     url     : apiurl,
                     type    : "GET",
                     data    : {p1: $("#input_debug_p1").val()},
-                    dataType: "json",
+                    dataType: "text",
                     success : function(data) {
                         $("#debug_output").html(JSON.stringify(data))
                     }
