@@ -1,7 +1,8 @@
-*.swp
-*.o
-*.exe
 *.cgi
-db.sqlite3
 *.dll
+*.exe
+*.o
+*.pyc
+*.swp
+db.sqlite3
 
