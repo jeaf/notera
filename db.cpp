@@ -120,8 +120,8 @@ void DB::insert_session(const map<string, string>& cookies, const string& user)
 {
     auto sid_it = cookies.find("sid");
     CHECK(sid_it != cookies.end(), "sid cookie not defined.");
-    exec(fmt("INSERT INTO session(id, user_id) VALUES(%1%, %2%)",
-         sid_it->second, user));
+    exec(fmt("INSERT INTO session(id, user) VALUES(%1%, '%2%')",
+             sid_it->second, user));
 }
 
 shared_ptr<User> DB::get_user(const string& name)
@@ -139,7 +139,7 @@ shared_ptr<User> DB::get_user(const string& name)
 
 shared_ptr<User> DB::insert_user(const string& name)
 {
-    exec(fmt("INSERT INTO user(name) VALUES(%1%)", name));
+    exec(fmt("INSERT INTO user(name) VALUES('%1%')", name));
     return get_user(name);
 }
 
