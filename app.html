@@ -119,11 +119,10 @@
 
             function debug_PUT() {
                 $.ajax({
-                    url     : apiurl,
+                    url     : apiurl + "?p1=" + $("#input_debug_p1").val() +
+                                       "&p2=" + $("#input_debug_p2").val(),
                     type    : "PUT",
-                    data    : {p1: $("#input_debug_p1").val(),
-                               p2: $("#input_debug_p2").val()},
-                    dataType: "json",
+                    dataType: "text",
                     success : function(data) {
                         $("#debug_output").html(JSON.stringify(data))
                     }
