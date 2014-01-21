@@ -171,8 +171,16 @@ int main(int argc, char* argv[], char* envp[])
         DB db("db.sqlite3");
         db.log(env);
 
+        // Get the current session ID, setting the cookie if necessary
+        string sid = cookies["sid"];
+        if (sid.empty())
+        {
+            sid = fmt("%1%", gen_sid(db));
+            resp.set_cookie("sid", sid, max_session_age);
+        }
+
         // Load the current session
-        auto ses = db.get_session(cookies);
+        auto ses = db.get_session(sid);
 
         // Trace some things for debugging purposes
         resp.data["method"] = env["REQUEST_METHOD"];
@@ -184,11 +192,13 @@ int main(int argc, char* argv[], char* envp[])
         {
             if (env["REQUEST_METHOD"] == "GET")
             {
-                resp.data["user"] = ses->user;
-                resp.data["auth"] = fmt("%1%", ses->auth);
-                auto u = db.get_user(ses->user);
-                if (u)
+                if (ses)
                 {
+                    CHECK(!ses->user.empty(), "User name should be defined here.");
+                    resp.data["user"] = ses->user;
+                    resp.data["auth"] = fmt("%1%", ses->auth);
+                    auto u = db.get_user(ses->user);
+                    CHECK(u, "User should have already been created here", ses->user);
                     resp.data["salt"] = u->salt;
                 }
             }
@@ -198,7 +208,7 @@ int main(int argc, char* argv[], char* envp[])
                 Sha1 sha(ses->user);
                 auto u = db.get_user(ses->user);
                 sha.update(u->pwd_hash);
-                sha.update(cookies["sid"]);
+                sha.update(sid);
                 sha.result();
                 unsigned int* s = sha.Message_Digest;
                 string expected_auth_token = fmt("%02x%02x%02x%02x%02x", s[0],
@@ -207,27 +217,29 @@ int main(int argc, char* argv[], char* envp[])
                 // Compare the expected auth token to the submitted one
                 if (expected_auth_token == post_data["token"])
                 {
-                    // User is authenticated, store the session
+                    // User is authenticated
                     db.exec(fmt("UPDATE session SET auth=%1% WHERE id=%2%",
-                                1, cookies["sid"]));
+                                1, sid));
                     resp.data["auth"] = "1";
                 }
                 else
                 {
-                    resp.set_cookie("sid", fmt("%1%", gen_sid(db)), max_session_age);
+                    db.exec(fmt("DELETE FROM session WHERE id=%1%", sid));
                 }
             }
             else if (env["REQUEST_METHOD"] == "PUT")
             {
-                CHECK(ses->user == "",
-                      "Session is already linked with user %1%", ses->user);
+                if (ses)
+                {
+                    db.delete_session(sid);
+                }
                 CHECK(!query_string["p2"].empty(), "Empty p2 parameter");
                 auto u = db.get_user(query_string["p2"]);
                 if (!u)
                 {
                     u = db.insert_user(query_string["p2"]);
                 }
-                db.insert_session(cookies, query_string["p2"]);
+                db.insert_session(sid, query_string["p2"]);
                 resp.data["salt"] = u->salt;
             }
         }

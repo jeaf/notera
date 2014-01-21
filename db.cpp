@@ -84,44 +84,31 @@ void DB::exec(const std::string& sql)
     db_.exec(sql, NULL, NULL, NULL);
 }
 
-shared_ptr<Session> DB::get_session(const map<string, string>& cookies)
+shared_ptr<Session> DB::get_session(const string& sid_str)
 {
-    auto s = make_shared<Session>();
-    s->auth = 0;
-    auto sid_it = cookies.find("sid");
-    const string sid_str = sid_it != cookies.end() ? sid_it->second : "";
-
-    bool authenticated = false;
+    shared_ptr<Session> s;
     auto stmt = db_.prepare_v2(
         fmt("SELECT user, auth, (strftime('%%s', 'now') - create_time) "
             "as age FROM session WHERE id='%s'", sid_str), -1, 0);
-    string user;
-    long age = max_session_age;
-    string salt;
     if (stmt->step() == SQLITE_ROW)
     {
-        auto stmt2 = db_.prepare_v2(
-            fmt("SELECT salt FROM user WHERE name='%1%'",
-                stmt->column_text(0)), -1, 0);
-        if (stmt2->step() == SQLITE_ROW)
-        {
-            salt = stmt2->column_text(0);
-        }
+        s.reset(new Session);
+        s->user = stmt->column_text(0);
         s->auth = stmt->column_int(1);
-        age  = stmt->column_int(2);
+        s->age  = stmt->column_int(2);
     }
-    if (age < max_session_age) authenticated = true;
-
-    s->user = user;
     return s;
 }
 
-void DB::insert_session(const map<string, string>& cookies, const string& user)
+void DB::insert_session(const string& sid_str, const string& user)
 {
-    auto sid_it = cookies.find("sid");
-    CHECK(sid_it != cookies.end(), "sid cookie not defined.");
     exec(fmt("INSERT INTO session(id, user) VALUES(%1%, '%2%')",
-             sid_it->second, user));
+             sid_str, user));
+}
+
+void DB::delete_session(const std::string& sid_str)
+{
+    exec(fmt("DELETE FROM session WHERE id=%1%", sid_str));
 }
 
 shared_ptr<User> DB::get_user(const string& name)

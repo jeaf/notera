@@ -13,6 +13,7 @@ class Session
 public:
     std::string user;
     long        auth;
+    long        age;
 };
 
 class User
@@ -30,9 +31,10 @@ public:
 
     void exec(const std::string& sql);
 
-    std::shared_ptr<Session> get_session(const std::map<std::string, std::string>& cookies);
-    void insert_session(const std::map<std::string, std::string>& cookies,
+    std::shared_ptr<Session> get_session(const std::string& sid_str);
+    void insert_session(const std::string& sid_str,
                         const std::string& user);
+    void delete_session(const std::string& sid_str);
     std::shared_ptr<User> get_user(const std::string& name);
     std::shared_ptr<User> insert_user(const std::string& name);
     void log(const std::map<std::string, std::string>& env);
