@@ -47,7 +47,6 @@
         <script src="http://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
         <script src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/jquery-ui.min.js"></script>
         <script src="http://cdnjs.cloudflare.com/ajax/libs/highlight.js/7.3/highlight.min.js"></script>
-        <script src="http://cdnjs.cloudflare.com/ajax/libs/jquery-cookie/1.3.1/jquery.cookie.min.js"></script>
         <script src="http://cdnjs.cloudflare.com/ajax/libs/marked/0.2.9/marked.min.js"></script>
         <script src="http://crypto-js.googlecode.com/svn/tags/3.1.2/build/rollups/sha1.js"></script>
         <script>
@@ -56,7 +55,10 @@
 
             $(document).ready(function() {
                 // GET the session
-                $.get(apiurl, {p1: "session"}, function(data) {sdata = data})
+                $.get(apiurl, {p1: "session"}, function(data) {
+                    sdata = data
+                    console.log("GET session: " + JSON.stringify(sdata))
+                })
 
                 // Hide the "loading" div, and show the appropriate div
                 $("#div_loading").hide()
@@ -69,39 +71,51 @@
                 }
             })
 
-            function get_user_salt(user) {
-                // If the user was not registered, we need to PUT the session
-                if (sdata.user == "")
-                {
-                    $.ajax({
-                        url    : apiurl,
-                        type   : "PUT",
-                        data   : {p1: "session", p2: user},
-                        success: function(data) {sdata.salt = data.salt}
-                    })
-                }
-            }
-
             function submit_login() {
-                get_user_salt($("#input_user").val())
-                token = CryptoJS.SHA1($("#input_pwd").val()+ sdata.salt)
-                token = CryptoJS.SHA1($("#input_user").val() + token + $.cookie("sid"))
+                u = $("#input_user").val()
                 $.ajax({
-                    url    : apiurl,
-                    type   : "POST",
-                    data   : {p1: "session"},
-                    success: function(data) {}
+                    url    : apiurl + "?p1=session&p2=" + u,
+                    type   : "PUT",
+                    success: function(data) {
+                        console.log("PUT session: " + JSON.stringify(data))
+                        console.log("user: " + u + ", salt: " + data.salt)
+                        tok = CryptoJS.SHA1($("#input_pwd").val()+ data.salt)
+                        console.log("pwd_hash: " + tok)
+                        console.log("sid: " + data.sid)
+                        tok = CryptoJS.SHA1(u + tok + data.sid)
+                        $.ajax({
+                            url    : apiurl + "?p1=session",
+                            type   : "POST",
+                            data   : {token: String(tok)},
+                            success: function(data) {
+                                console.log("POST session: " + JSON.stringify(data))
+                                if (data.auth == 1)
+                                {
+                                    $("#div_app").show()
+                                }
+                            }
+                        })
+                    }
                 })
             }
 
             function submit_new_account() {
-                get_user_salt($("#input_user").val())
-                token = CryptoJS.SHA1($("#input_pwd").val() + sdata.salt)
+                u = $("#input_user").val()
                 $.ajax({
-                    url    : apiurl + "?p1=user",
-                    type   : "POST",
-                    data   : {pwd_hash: String(token)},
-                    success: function(data) {}
+                    url    : apiurl + "?p1=session&p2=" + u,
+                    type   : "PUT",
+                    success: function(data) {
+                        alert("PUT session: " + JSON.stringify(data))
+                        token = CryptoJS.SHA1($("#input_pwd").val() + data.salt)
+                        $.ajax({
+                            url    : apiurl + "?p1=user&p2=" + u,
+                            type   : "POST",
+                            data   : {pwd_hash: String(token)},
+                            success: function(data2) {
+                                alert("POST session: " + JSON.stringify(data2))
+                            }
+                        })
+                    }
                 })
             }
 

@@ -112,7 +112,7 @@ class Resp
 public:
     void set_cookie(const string& name, const string& value, long max_age)
     {
-        headers.push_back(fmt("Set-Cookie: %1%=%2%; Max-Age=%3%",
+        headers.push_back(fmt("Set-Cookie: %1%=%2%; Max-Age=%3%; HttpOnly",
                               name, value, max_age));
     }
 
@@ -158,6 +158,7 @@ map<string, string> parse_post(const map<string, string>& env)
 int main(int argc, char* argv[], char* envp[])
 {
     Resp resp;
+    resp.data["auth"] = "0";
 
     try
     {
@@ -184,14 +185,22 @@ int main(int argc, char* argv[], char* envp[])
 
         // Trace some things for debugging purposes
         resp.data["method"] = env["REQUEST_METHOD"];
-        resp.data["p1"] = query_string["p1"];
-        resp.data["p2"] = query_string["p2"];
+        resp.data["p1"]     = query_string["p1"];
+        resp.data["p2"]     = query_string["p2"];
+        resp.data["token"]  = post_data["token"];
+        resp.data["step"]   = "1";
 
         // Process API calls
         if (query_string["p1"] == "session")
         {
+            // For session management API calls, return the SID cookie, to will
+            // avoid having to mess with cookies on the client side, and the
+            // cookie can be made HttpOnly
+            resp.data["sid"]    = sid;
+
             if (env["REQUEST_METHOD"] == "GET")
             {
+                resp.data["step"]   = "2";
                 if (ses)
                 {
                     CHECK(!ses->user.empty(), "User name should be defined here.");
@@ -204,19 +213,31 @@ int main(int argc, char* argv[], char* envp[])
             }
             else if (env["REQUEST_METHOD"] == "POST")
             {
+                CHECK(ses, "Must register a session first");
+                CHECK(!post_data["token"].empty(), "No token submitted");
+
+                resp.data["step"]   = "3";
                 // Construct the expected auth token
-                Sha1 sha(ses->user);
                 auto u = db.get_user(ses->user);
+                CHECK(u, "User not defined");
+                Sha1 sha(ses->user);
                 sha.update(u->pwd_hash);
                 sha.update(sid);
                 sha.result();
                 unsigned int* s = sha.Message_Digest;
-                string expected_auth_token = fmt("%02x%02x%02x%02x%02x", s[0],
+                string expected_auth_token = fmt("%04x%04x%04x%04x%04x", s[0],
                                                  s[1], s[2], s[3], s[4]);
+
+                // For debug
+                resp.data["expected_auth_token"] = expected_auth_token;
+                resp.data["user"] = ses->user;
+                resp.data["pwd_hash"] = u->pwd_hash;
+                resp.data["sid"] = sid;
 
                 // Compare the expected auth token to the submitted one
                 if (expected_auth_token == post_data["token"])
                 {
+                    resp.data["step"]   = "4";
                     // User is authenticated
                     db.exec(fmt("UPDATE session SET auth=%1% WHERE id=%2%",
                                 1, sid));
@@ -224,7 +245,7 @@ int main(int argc, char* argv[], char* envp[])
                 }
                 else
                 {
-                    db.exec(fmt("DELETE FROM session WHERE id=%1%", sid));
+                    //db.exec(fmt("DELETE FROM session WHERE id=%1%", sid));
                 }
             }
             else if (env["REQUEST_METHOD"] == "PUT")
@@ -233,14 +254,32 @@ int main(int argc, char* argv[], char* envp[])
                 {
                     db.delete_session(sid);
                 }
+                resp.data["step"]   = "5";
                 CHECK(!query_string["p2"].empty(), "Empty p2 parameter");
+                resp.data["step"]   = "5a";
                 auto u = db.get_user(query_string["p2"]);
+                resp.data["step"]   = "5b";
                 if (!u)
                 {
+                    resp.data["step"]   = "5c";
                     u = db.insert_user(query_string["p2"]);
                 }
+                resp.data["step"]   = "6";
                 db.insert_session(sid, query_string["p2"]);
                 resp.data["salt"] = u->salt;
+            }
+        }
+        else if (query_string["p1"] == "user")
+        {
+            if (env["REQUEST_METHOD"] == "POST")
+            {
+                resp.data["step"]   = "7";
+                auto u = db.get_user(query_string["p2"]);
+                CHECK(u, "User %1% does not exists; please create a session "
+                         "first with PUT /session/user", query_string["p2"]);
+                CHECK(u->pwd_hash.empty(), "Request rejected");
+                db.set_user_pwd_hash(query_string["p2"],
+                                     post_data["pwd_hash"]);
             }
         }
 

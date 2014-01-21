@@ -37,6 +37,7 @@ public:
     void delete_session(const std::string& sid_str);
     std::shared_ptr<User> get_user(const std::string& name);
     std::shared_ptr<User> insert_user(const std::string& name);
+    void set_user_pwd_hash(const std::string& name, const std::string& phash);
     void log(const std::map<std::string, std::string>& env);
 
     int64_t random_int64();

@@ -52,7 +52,7 @@ DB::DB(const string& path)
     "    create_time  INTEGER NOT NULL DEFAULT (strftime('%s', 'now')));"
     "CREATE TABLE IF  NOT EXISTS user("
     "    name         TEXT PRIMARY KEY,"
-    "    pwd_hash     TEXT,"
+    "    pwd_hash     TEXT NOT NULL DEFAULT '',"
     "    salt         TEXT NOT NULL DEFAULT (RANDOM()));"
     "CREATE TABLE IF  NOT EXISTS tag("
     "    name         TEXT PRIMARY KEY);"
@@ -115,11 +115,12 @@ shared_ptr<User> DB::get_user(const string& name)
 {
     shared_ptr<User> u;
     auto stmt = db_.prepare_v2(
-        fmt("SELECT salt FROM user WHERE name='%1%'", name), -1, 0);
+        fmt("SELECT pwd_hash, salt FROM user WHERE name='%1%'", name), -1, 0);
     if (stmt->step() == SQLITE_ROW)
     {
         u.reset(new User);
-        u->salt = stmt->column_text(0);
+        u->pwd_hash = stmt->column_text(0);
+        u->salt     = stmt->column_text(1);
     }
     return u;
 }
@@ -128,6 +129,11 @@ shared_ptr<User> DB::insert_user(const string& name)
 {
     exec(fmt("INSERT INTO user(name) VALUES('%1%')", name));
     return get_user(name);
+}
+
+void DB::set_user_pwd_hash(const string& name, const string& phash)
+{
+    exec(fmt("UPDATE user SET pwd_hash='%1%' WHERE name='%2%'", phash, name));
 }
 
 void DB::log(const map<string, string>& env)
