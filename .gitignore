@@ -4,5 +4,6 @@
 *.o
 *.pyc
 *.swp
+cookies.txt
 db.sqlite3
 
