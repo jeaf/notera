@@ -24,12 +24,12 @@
                 </form>
             </div>
             <div id="div_list" style="display:none">
-                <p>The App</p>
+                <input type="button" value="New Note" onClick="new_note()" />
+            </div>
+            <div id="div_note" style="display:none">
                 <textarea id="textarea_note_title" rows="1" cols="60"></textarea>
                 <textarea id="textarea_note_text" rows="6" cols="60"></textarea>
                 <input type="button" value="Save" onClick="save_note()" />
-            </div>
-            <div id="div_note" style="display:none">
             </div>
         </div>
         <script src="http://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
@@ -94,14 +94,14 @@
                     url    : apiurl + "?p1=session&p2=" + u,
                     type   : "PUT",
                     success: function(data) {
-                        alert("PUT session: " + JSON.stringify(data))
+                        console.debug("PUT session: " + JSON.stringify(data))
                         token = CryptoJS.SHA1($("#input_pwd").val() + data.salt)
                         $.ajax({
                             url    : apiurl + "?p1=user&p2=" + u,
                             type   : "POST",
                             data   : {pwd_hash: String(token)},
                             success: function(data2) {
-                                alert("POST session: " + JSON.stringify(data2))
+                                console.debug("POST session: " + JSON.stringify(data2))
                             }
                         })
                     }
@@ -110,6 +110,16 @@
 
             function save_note() {
                 console.debug("Saving")
+            }
+
+            function new_note() {
+                $.ajax({
+                    url    : apiurl + "?p1=note",
+                    type   : "POST",
+                    success: function(data) {
+                        console.debug("POST note: " + JSON.stringify(data))
+                    }
+                })
             }
 
         </script>

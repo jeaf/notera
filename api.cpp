@@ -223,7 +223,7 @@ int main(int argc, char* argv[], char* envp[])
                 sha.update(sid);
                 sha.result();
                 unsigned int* s = sha.Message_Digest;
-                string expected_auth_token = fmt("%04x%04x%04x%04x%04x", s[0],
+                string expected_auth_token = fmt("%08x%08x%08x%08x%08x", s[0],
                                                  s[1], s[2], s[3], s[4]);
 
                 // For debug
@@ -278,6 +278,29 @@ int main(int argc, char* argv[], char* envp[])
                 CHECK(u->pwd_hash.empty(), "Request rejected");
                 db.set_user_pwd_hash(query_string["p2"],
                                      post_data["pwd_hash"]);
+            }
+        }
+        else if (query_string["p1"] == "note")
+        {
+            CHECK(ses && ses->auth, "Unauthorized");
+
+            if (env["REQUEST_METHOD"] == "GET")
+            {
+                if (query_string["p2"].empty())
+                {
+                    string s;
+                    auto v = db.get_note_list(ses->user);
+                    foreach_(const auto& n, v)
+                    {
+                        s += fmt("%1%,%2%,", n.id, n.title);
+                    }
+                    resp.data["note_list"] = s;
+                }
+            }
+            else if (env["REQUEST_METHOD"] == "POST")
+            {
+                db.exec(fmt("INSERT INTO note(user) VALUES('%1%')", ses->user));
+                resp.data["note_id"] = fmt("%1%", db.db_.last_rowid());
             }
         }
     }

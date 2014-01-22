@@ -32,6 +32,7 @@ public:
     void open(const std::string& path);
     const char* errmsg();
     int64_t random_int64();
+    int64_t last_rowid();
 
 private:
     sqlite3* db;

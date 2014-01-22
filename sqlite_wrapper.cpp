@@ -80,3 +80,8 @@ int64_t Sqlite::random_int64()
     return stmt->column_int64(0);
 }
 
+int64_t Sqlite::last_rowid()
+{
+    return sqlite3_last_insert_rowid(db);
+}
+

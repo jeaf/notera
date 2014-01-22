@@ -43,8 +43,10 @@ DB::DB(const string& path)
     db_.exec(
     "CREATE TABLE IF  NOT EXISTS note("
     "    id           INTEGER PRIMARY KEY,"
-    "    title        TEXT,"
-    "    content      TEXT);"
+    "    user         TEXT NOT NULL,"
+    "    title        TEXT NOT NULL DEFAULT '',"
+    "    content      TEXT NOT NULL DEFAULT '',"
+    "    FOREIGN KEY(user) REFERENCES user(name) ON DELETE CASCADE);"
     "CREATE TABLE IF  NOT EXISTS session("
     "    id           INTEGER PRIMARY KEY,"
     "    user         TEXT NOT NULL,"
@@ -53,21 +55,7 @@ DB::DB(const string& path)
     "CREATE TABLE IF  NOT EXISTS user("
     "    name         TEXT PRIMARY KEY,"
     "    pwd_hash     TEXT NOT NULL DEFAULT '',"
-    "    salt         TEXT NOT NULL DEFAULT (RANDOM()));"
-    "CREATE TABLE IF  NOT EXISTS tag("
-    "    name         TEXT PRIMARY KEY);"
-    "CREATE TABLE IF  NOT EXISTS note_user_rel("
-    "    user_id      TEXT NOT NULL,"
-    "    note_id      INTEGER NOT NULL,"
-    "    PRIMARY KEY(user_id, note_id),"
-    "    FOREIGN KEY(user_id) REFERENCES user(name) ON DELETE CASCADE,"
-    "    FOREIGN KEY(note_id) REFERENCES note(id) ON DELETE CASCADE);"
-    "CREATE TABLE IF  NOT EXISTS note_tag_rel("
-    "    tag_id       TEXT NOT NULL,"
-    "    note_id      INTEGER NOT NULL,"
-    "    PRIMARY KEY(tag_id, note_id),"
-    "    FOREIGN KEY(tag_id) REFERENCES tag(name) ON DELETE CASCADE,"
-    "    FOREIGN KEY(note_id) REFERENCES note(id) ON DELETE CASCADE);",
+    "    salt         TEXT NOT NULL DEFAULT (RANDOM()));",
     0, 0, 0);
     string log_def(
     "CREATE TABLE IF NOT EXISTS log("
@@ -152,6 +140,21 @@ void DB::log(const map<string, string>& env)
     }
     *sql.rbegin() = ')';
     db_.exec(sql, 0, 0, 0);
+}
+
+vector<NoteDesc> DB::get_note_list(const string& user)
+{
+    vector<NoteDesc> v;
+    auto stmt = db_.prepare_v2(
+        fmt("SELECT id,title FROM note WHERE user='%1%'", user), -1, 0);
+    while (stmt->step() == SQLITE_ROW)
+    {
+        NoteDesc nd;
+        nd.id    = stmt->column_int(0);
+        nd.title = stmt->column_text(1);
+        v.push_back(nd);
+    }
+    return v;
 }
 
 int64_t DB::random_int64()
