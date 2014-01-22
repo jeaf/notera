@@ -65,6 +65,9 @@
                 </div>
                 <div id="div_sidebar">
                     <input type="button" value="New Note" onClick="new_note()" />
+                    <input type="button" value="Reload Notes List" onClick="load_notes_list()" />
+                    <ol id="ol_note_list">
+                    </ol>
                 </div>
                 <div id="div_main">
                     <textarea id="textarea_note_title" rows="1" cols="60"></textarea>
@@ -163,6 +166,22 @@
                     type   : "POST",
                     success: function(data) {
                         console.debug("POST note: " + JSON.stringify(data))
+                    }
+                })
+            }
+
+            function load_notes_list() {
+                $.ajax({
+                    url    : apiurl + "?p1=note",
+                    type   : "GET",
+                    dataType: "json",
+                    success: function(data) {
+                        console.debug("GET note: " + JSON.stringify(data))
+                        items = []
+                        $.each(data.note_list, function(i, obj) {
+                            items.push("<li>" + obj + "</li>")
+                        })
+                        $("#ol_note_list").html(items.join(""))
                     }
                 })
             }

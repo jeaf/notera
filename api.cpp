@@ -119,6 +119,22 @@ public:
         cout << "Content-type: " << "application/json" << endl;
         foreach_(const auto& h, headers) cout << h << endl;
         cout << endl << "{";
+
+
+
+        foreach_(const auto& d, data_list)
+	{
+	    cout << "\"" << d.first << "\": [";
+	    bool first = true;
+	    foreach_(const auto& e, d.second)
+	    {
+		if (!first) cout << ", ";
+		first = false;
+		cout << e;
+	    }
+	    cout << "], ";
+	}
+
         long i = data.size();
         foreach_(const auto& d, data)
         {
@@ -131,6 +147,7 @@ public:
     }
 
     map<string, string> data;
+    map<string, vector<string>> data_list;
 
 private:
     vector<string>      headers;
@@ -288,13 +305,11 @@ int main(int argc, char* argv[], char* envp[])
             {
                 if (query_string["p2"].empty())
                 {
-                    string s;
                     auto v = db.get_note_list(ses->user);
                     foreach_(const auto& n, v)
                     {
-                        s += fmt("%1%,%2%,", n.id, n.title);
+			resp.data_list["note_list"].push_back(fmt("%1%", n.id));
                     }
-                    resp.data["note_list"] = s;
                 }
             }
             else if (env["REQUEST_METHOD"] == "POST")
