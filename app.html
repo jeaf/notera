@@ -1,9 +1,45 @@
 <html>
     <head>
         <style>
-            header {
-                height             : 30px;
-                border-bottom-style: solid;
+            #div_logged_in {
+                width      : 750px;
+                margin     : 0 auto;
+                background : #99c;
+            }
+            #div_header {
+                padding:5px 5px;
+                background:#ddd;
+            }
+            #div_nav {
+                padding:5px 5px;
+                background:#c99;
+            }
+            #div_footer {
+                clear: both;
+                background:#cc9;
+                padding: 5px 5px;
+            }
+            #div_main {
+                background:#9c9;
+                float:right;
+                width:530px;
+                padding: 5px;
+            }
+            #div_sidebar {
+                background:#c9c;
+                float:left;
+                width:200px;
+                padding: 5px;
+            }
+            #div_nav ul {
+                margin:0;
+                padding:0;
+                list-style:none;
+            }
+            #div_nav li {
+                display:inline;
+                margin:0;
+                padding:0;
             }
         </style>
     </head>
@@ -12,10 +48,7 @@
             <p>Loading...</p>
         </div>
         <div id="div_loaded" style="display:none">
-            <header id="div_header">
-                <p>Header</p>
-            </header>
-            <div id="div_login" style="display:none">
+            <div id="div_not_logged_in" style="display:none">
                 <form id="form_login">
                     Username: <input id="input_user" type="text"><br/>
                     Password: <input id="input_pwd"  type="password"><br/>
@@ -23,13 +56,24 @@
                     <input type="button" value="Create New Account" onClick="submit_new_account()" />
                 </form>
             </div>
-            <div id="div_list" style="display:none">
-                <input type="button" value="New Note" onClick="new_note()" />
-            </div>
-            <div id="div_note" style="display:none">
-                <textarea id="textarea_note_title" rows="1" cols="60"></textarea>
-                <textarea id="textarea_note_text" rows="6" cols="60"></textarea>
-                <input type="button" value="Save" onClick="save_note()" />
+            <div id="div_logged_in" style="display:none">
+                <div id="div_header">
+                    <p>Header</p>
+                </div>
+                <div id="div_nav">
+                    <p>Nav</p>
+                </div>
+                <div id="div_sidebar">
+                    <input type="button" value="New Note" onClick="new_note()" />
+                </div>
+                <div id="div_main">
+                    <textarea id="textarea_note_title" rows="1" cols="60"></textarea>
+                    <textarea id="textarea_note_text" rows="6" cols="60"></textarea>
+                    <input type="button" value="Save" onClick="save_note()" />
+                </div>
+                <div id="div_footer">
+                    <p>Footer</p>
+                </div>
             </div>
         </div>
         <script src="http://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
@@ -49,12 +93,13 @@
                     $("#div_loading").hide()
                     $("#div_loaded").show()
                     if (sdata.auth == "1") {
-                        $("#div_login").hide()
-                        $("#div_list").show()
+                        $("#div_not_logged_in").hide()
+                        $("#div_logged_in").show()
                     }
                     else {
                         $("#input_user").val(sdata.user)
-                        $("#div_login").show()
+                        $("#div_not_logged_in").show()
+                        $("#div_logged_in").hide()
                     }
                 })
             })
@@ -79,8 +124,8 @@
                                 console.log("POST session: " + JSON.stringify(data))
                                 if (data.auth == 1)
                                 {
-                                    $("#div_login").hide()
-                                    $("#div_list").show()
+                                    $("#div_not_logged_in").hide()
+                                    $("#div_sidebar").show()
                                 }
                             }
                         })
