@@ -8,9 +8,8 @@ SQLITE_FLAGS   = -DSQLITE_THREADSAFE=0 -DSQLITE_OMIT_LOAD_EXTENSION -DSQLITE_TEM
 CFLAGS        += $(SQLITE_FLAGS)
 CXXFLAGS      += $(SQLITE_FLAGS)
 
-$(EXEC).cgi: $(OBJS)
+$(EXEC).exe: $(OBJS)
 	g++ $(CXXFLAGS) -o $@ $+
-	cp $(EXEC).cgi $(EXEC).exe
 
 api.o: api.cpp sha1.h sqlite_wrapper.h util.h
 db.o: db.cpp db.h sqlite_wrapper.h
@@ -21,5 +20,5 @@ util.o: util.cpp util.h
 
 .PHONY: clean
 clean:
-	rm -f $(EXEC).cgi $(EXEC).exe $(OBJS)
+	rm -f $(EXEC).exe $(OBJS)
 
