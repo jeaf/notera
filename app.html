@@ -70,6 +70,7 @@
                     </ul>
                 </div>
                 <div id="div_main">
+                    <textarea id="textarea_note_id"></textarea>
                     <textarea id="textarea_note_title" rows="1" cols="60"></textarea>
                     <textarea id="textarea_note_text" rows="6" cols="60"></textarea>
                     <input type="button" value="Save" onClick="save_note()" />
@@ -157,7 +158,15 @@
             }
 
             function save_note() {
-                console.debug("Saving")
+                var i = $("#textarea_note_id").val()
+                $.ajax({
+                    url    : apiurl + "?p1=note&p2=" + i,
+                    type   : "PUT",
+                    data   : {title: "dechet", content: "rebut"},
+                    success: function(data) {
+                        console.log("PUT note: " + JSON.stringify(data))
+                    }
+                })
             }
 
             function new_note() {
@@ -188,6 +197,7 @@
 
             function show_note(i) {
                 console.debug("show_note: " + i)
+                $("#textarea_note_id").val(i)
                 $.ajax({
                     url    : apiurl + "?p1=note&p2=" + i,
                     type   : "GET",

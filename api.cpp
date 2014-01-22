@@ -202,8 +202,11 @@ int main(int argc, char* argv[], char* envp[])
         resp.data["method"] = env["REQUEST_METHOD"];
         resp.data["p1"]     = query_string["p1"];
         resp.data["p2"]     = query_string["p2"];
-        resp.data["token"]  = post_data["token"];
         resp.data["step"]   = "1";
+	foreach_(const auto& i, post_data)
+	{
+	    resp.data["post_data"] += i.first + ", " + i.second + ", ";
+	}
 
         // Process API calls
         if (query_string["p1"] == "session")
@@ -326,6 +329,16 @@ int main(int argc, char* argv[], char* envp[])
                 db.exec(fmt("INSERT INTO note(user) VALUES('%1%')", ses->user));
                 resp.data["note_id"] = fmt("%1%", db.db_.last_rowid());
             }
+	    else if (env["REQUEST_METHOD"] == "PUT")
+	    {
+		CHECK(!query_string["p2"].empty(), "p2 not provided");
+		resp.data["title"]   = post_data["title"];
+		resp.data["content"] = post_data["content"];
+		db.exec(fmt(
+		    "UPDATE note SET title='%1%', content='%2%' WHERE id=%3%",
+		    post_data["title"], post_data["content"],
+		    query_string["p2"]));
+	    }
         }
     }
     catch (const std::exception& ex)
