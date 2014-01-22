@@ -6,27 +6,40 @@
 //                 - auth : 1 if session is authenticated, 0 otherwise.
 //                 - user : the user associated with the session, if any.
 //                 - salt : the salt associated with the user, if any.
-//                 - error: "" if the call was successful, otherwise error msg.
 //     POST  : Authenticate session (login).
 //             Parameters:
 //                 - token: the security token, defined as follows:
 //                          SHA1(user + SHA1(pwd + salt) + sid)
 //             Returned values:
 //                 - auth : 1 if authentication was accepted, 0 otherwise.
-//                 - error: "" if the call was successful, otherwise error msg.
 //     DELETE: Delete the current session (logout).
 //
 // /session/<user>
 //     PUT   : Associate the session with a specific user.
 //             Returned values:
 //                 - salt : the salt associated with the user.
-//                 - error: "" if the call was successful, otherwise error msg.
+//
 // /user/<user>
 //     POST  : Create a new user. 
 //             Parameters:
 //                 - pwd_hash: SHA1(pwd + salt)
+//
+// /note
+//     GET   : Get the list of notes
+//     POST  : Create a new note
 //             Returned values:
-//                 - error: "" if the call was successful, otherwise error msg.
+//                 - id: the id of the new note
+//
+// /note/<id>
+//     GET   : Get the contents of the note
+//             Returned values:
+//                 - title
+//                 - text
+//     PUT   : Update the contents of the note
+//             Parameters:
+//                 - title
+//                 - text
+//     DELETE: Delete the note
 
 #include "db.h"
 #include "sha1.h"
