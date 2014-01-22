@@ -311,6 +311,15 @@ int main(int argc, char* argv[], char* envp[])
 			resp.data_list["note_list"].push_back(fmt("%1%", n.id));
                     }
                 }
+		else
+		{
+		    auto n = db.get_note(query_string["p2"]);
+		    if (n)
+		    {
+			resp.data["title"]   = n->title_;
+			resp.data["content"] = n->content_;
+		    }
+		}
             }
             else if (env["REQUEST_METHOD"] == "POST")
             {

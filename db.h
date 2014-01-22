@@ -32,6 +32,13 @@ public:
     std::string title;
 };
 
+class Note
+{
+public:
+    std::string title_;
+    std::string content_;
+};
+
 class DB
 {
 public:
@@ -49,6 +56,7 @@ public:
     void log(const std::map<std::string, std::string>& env);
 
     std::vector<NoteDesc> get_note_list(const std::string& user);
+    std::shared_ptr<Note> get_note(const std::string& id);
 
     int64_t random_int64();
 

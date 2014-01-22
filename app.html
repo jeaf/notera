@@ -66,8 +66,8 @@
                 <div id="div_sidebar">
                     <input type="button" value="New Note" onClick="new_note()" />
                     <input type="button" value="Reload Notes List" onClick="load_notes_list()" />
-                    <ol id="ol_note_list">
-                    </ol>
+                    <ul id="ul_note_list">
+                    </ul>
                 </div>
                 <div id="div_main">
                     <textarea id="textarea_note_title" rows="1" cols="60"></textarea>
@@ -179,9 +179,23 @@
                         console.debug("GET note: " + JSON.stringify(data))
                         items = []
                         $.each(data.note_list, function(i, obj) {
-                            items.push("<li>" + obj + "</li>")
+                            items.push('<li onclick="show_note(' + obj + ')">' + obj + '</li>')
                         })
-                        $("#ol_note_list").html(items.join(""))
+                        $("#ul_note_list").html(items.join(""))
+                    }
+                })
+            }
+
+            function show_note(i) {
+                console.debug("show_note: " + i)
+                $.ajax({
+                    url    : apiurl + "?p1=note&p2=" + i,
+                    type   : "GET",
+                    dataType: "json",
+                    success: function(data) {
+                        console.debug("GET note with id: " + JSON.stringify(data))
+                        $("#textarea_note_title").val(data.title)
+                        $("#textarea_note_text").val(data.content)
                     }
                 })
             }

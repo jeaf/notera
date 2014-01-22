@@ -157,6 +157,20 @@ vector<NoteDesc> DB::get_note_list(const string& user)
     return v;
 }
 
+shared_ptr<Note> DB::get_note(const string& id)
+{
+    shared_ptr<Note> n;
+    auto stmt = db_.prepare_v2(
+        fmt("SELECT title,content FROM note WHERE id=%1%", id), -1, 0);
+    if (stmt->step() == SQLITE_ROW)
+    {
+        n.reset(new Note);
+        n->title_   = stmt->column_text(0);
+        n->content_ = stmt->column_text(1);
+    }
+    return n;
+}
+
 int64_t DB::random_int64()
 {
     return db_.random_int64();
