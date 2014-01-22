@@ -1,53 +1,39 @@
 <html>
     <head>
+        <style>
+            header {
+                height             : 30px;
+                border-bottom-style: solid;
+            }
+        </style>
     </head>
     <body>
-        <div id="div_debug">
-            <form id="form_debug">
-                p1: <input id="input_debug_p1" type="text"><br/>
-                p2: <input id="input_debug_p2" type="text"><br/>
-                <input type="button" value="GET" onClick="debug_GET()" />
-                <input type="button" value="PUT" onClick="debug_PUT()" />
-            </form>
-            <p id="debug_output">This p should display the debug output.</p>
-        </div>
         <div id="div_loading">
             <p>Loading...</p>
         </div>
-        <div id="div_login" style="display:none">
-            <form id="form_login">
-                Username: <input id="input_user" type="text"><br/>
-                Password: <input id="input_pwd"  type="password"><br/>
-                <input type="button" value="Login" onClick="submit_login()" />
-                <input type="button" value="Create New Account" onClick="submit_new_account()" />
-            </form>
-        </div>
-        <div id="div_app" style="display:none">
-            <p>The App</p>
-            <textarea id="text-input" oninput="this.editor.update()"
-                      rows="6" cols="60">Type **Markdown** here.</textarea>
-            <div id="preview"> </div>
-            <!--<script>
-                marked.setOptions({
-                    highlight: function (code, lang) {
-                        return hljs.highlightAuto(lang, code).value;
-                    }
-                });
-                function Editor(input, preview) {
-                    this.update = function () {
-                        preview.innerHTML = marked(input.value);
-                    };
-                    input.editor = this;
-                    this.update();
-                }
-                var $ = function (id) { return document.getElementById(id); };
-                new Editor($("text-input"), $("preview"));
-            </script>-->
+        <div id="div_loaded" style="display:none">
+            <header id="div_header">
+                <p>Header</p>
+            </header>
+            <div id="div_login" style="display:none">
+                <form id="form_login">
+                    Username: <input id="input_user" type="text"><br/>
+                    Password: <input id="input_pwd"  type="password"><br/>
+                    <input type="button" value="Login" onClick="submit_login()" />
+                    <input type="button" value="Create New Account" onClick="submit_new_account()" />
+                </form>
+            </div>
+            <div id="div_list" style="display:none">
+                <p>The App</p>
+                <textarea id="textarea_note_title" rows="1" cols="60"></textarea>
+                <textarea id="textarea_note_text" rows="6" cols="60"></textarea>
+                <input type="button" value="Save" onClick="save_note()" />
+            </div>
+            <div id="div_note" style="display:none">
+            </div>
         </div>
         <script src="http://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
         <script src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/jquery-ui.min.js"></script>
-        <script src="http://cdnjs.cloudflare.com/ajax/libs/highlight.js/7.3/highlight.min.js"></script>
-        <script src="http://cdnjs.cloudflare.com/ajax/libs/marked/0.2.9/marked.min.js"></script>
         <script src="http://crypto-js.googlecode.com/svn/tags/3.1.2/build/rollups/sha1.js"></script>
         <script>
             apiurl = "cgi-bin/api.exe"
@@ -58,17 +44,19 @@
                 $.get(apiurl, {p1: "session"}, function(data) {
                     sdata = data
                     console.log("GET session: " + JSON.stringify(sdata))
-                })
 
-                // Hide the "loading" div, and show the appropriate div
-                $("#div_loading").hide()
-                if (sdata.auth == "1") {
-                    $("#div_app").show()
-                }
-                else {
-                    $("#input_user").val(sdata.user)
-                    $("#div_login").show()
-                }
+                    // Hide the "loading" div, and show the appropriate div
+                    $("#div_loading").hide()
+                    $("#div_loaded").show()
+                    if (sdata.auth == "1") {
+                        $("#div_login").hide()
+                        $("#div_list").show()
+                    }
+                    else {
+                        $("#input_user").val(sdata.user)
+                        $("#div_login").show()
+                    }
+                })
             })
 
             function submit_login() {
@@ -91,7 +79,8 @@
                                 console.log("POST session: " + JSON.stringify(data))
                                 if (data.auth == 1)
                                 {
-                                    $("#div_app").show()
+                                    $("#div_login").hide()
+                                    $("#div_list").show()
                                 }
                             }
                         })
@@ -119,28 +108,8 @@
                 })
             }
 
-            function debug_GET() {
-                $.ajax({
-                    url     : apiurl,
-                    type    : "GET",
-                    data    : {p1: $("#input_debug_p1").val()},
-                    dataType: "text",
-                    success : function(data) {
-                        $("#debug_output").html(JSON.stringify(data))
-                    }
-                })
-            }
-
-            function debug_PUT() {
-                $.ajax({
-                    url     : apiurl + "?p1=" + $("#input_debug_p1").val() +
-                                       "&p2=" + $("#input_debug_p2").val(),
-                    type    : "PUT",
-                    dataType: "text",
-                    success : function(data) {
-                        $("#debug_output").html(JSON.stringify(data))
-                    }
-                })
+            function save_note() {
+                console.debug("Saving")
             }
 
         </script>
