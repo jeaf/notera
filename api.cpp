@@ -50,21 +50,6 @@ typedef char_separator<char> char_sep;
 
 const long max_session_age = 7 * 24 * 3600;
 
-//void add_user(DB& db, const char* username, const char* pwd)
-//{
-//    const char* pwd_salt = "1kmalspdlf09sDFSDF";
-//    Sha1 sha(pwd);
-//    sha.update(pwd_salt);
-//    sha.result();
-//
-//    string s = fmt("INSERT INTO user(name, pwd_hash) "
-//                   "VALUES ('%s', '%02x%02x%02x%02x%02x');",
-//                   username, sha.Message_Digest[0], sha.Message_Digest[1],
-//                   sha.Message_Digest[2], sha.Message_Digest[3],
-//                   sha.Message_Digest[4]);
-//    db.exec(s);
-//}
-
 int64_t gen_sid(DB& db)
 {
     int64_t sid = db.random_int64();
@@ -282,105 +267,6 @@ int main(int argc, char* argv[], char* envp[])
                                      post_data["pwd_hash"]);
             }
         }
-
-        //else if (query_string["p2"] == "salt")
-        //{
-        //    string user_name = query_string["p1"];
-        //    auto stmt = db.prepare_v2(
-        //        fmt("SELECT pwd_salt FROM user WHERE name='%1%'", user_name),
-        //        -1, 0);
-        //    if (stmt->step() == SQLITE_ROW)
-        //    {
-        //        resp.data["salt"] = stmt->column_text(0);
-        //    }
-        //    else
-        //    {
-        //        resp.data["error"] = fmt("no such user: %1%", user_name);
-        //    }
-        //}
-
-        //// Check if login request
-        //else
-        //{
-        //    if (query_string.find("submit_login") != query_string.end())
-        //    {
-        //        // Read submitted credentials from stdin
-        //        auto content_len_it = env.find("CONTENT_LENGTH");
-        //        CHECK(content_len_it != env.end(),
-        //              "Invalid login request, no CONTENT_LENGTH defined.")
-        //        CHECK(!content_len_it->second.empty(),
-        //              "Invalid login request, CONTENT_LENGTH is empty.");
-        //        long content_len = lexical_cast<long>(content_len_it->second);
-        //        CHECK(content_len > 0,
-        //              "Invalid login request, unexpected CONTENT_LENGTH: %d",
-        //              content_len)
-        //        CHECK(content_len < 1024,
-        //              "Invalid login request, CONTENT_LENGTH too large: %d",
-        //              content_len)
-        //        char buf[1024] = {0};
-        //        long read_len = fread(buf, 1, content_len, stdin);
-        //        CHECK(read_len == content_len,
-        //              "Invalid login request, could not read data "
-        //              "(read: %d, CONTENT_LENGTH: %d)", read_len, content_len)
-        //        auto post_data = build_map(buf, "&", "=");
-
-        //        // Construct the expected auth token
-        //        Sha1 sha(post_data["username"]);
-        //        std::shared_ptr<Sqlite::Stmt> stmt = db.prepare_v2(
-        //            fmt("SELECT id,pwd_hash FROM user WHERE name='%s'",
-        //                post_data["username"]), -1, 0);
-        //        int rc = stmt->step();
-        //        string pwd_hash;
-        //        long long user_id = -1;
-        //        if (rc == SQLITE_ROW)
-        //        {
-        //            user_id = stmt->column_int64(0);
-        //            pwd_hash = stmt->column_text(1);
-        //        }
-        //        sha.update(pwd_hash);
-        //        string sid_str = fmt("%1%", sid);
-        //        sha.update(sid_str);
-        //        sha.result();
-        //        unsigned int* s = sha.Message_Digest;
-        //        string expected_auth_token = fmt("%02x%02x%02x%02x%02x", s[0],
-        //                                         s[1], s[2], s[3], s[4]);
-
-        //        // Compare the expected auth token to the submitted one
-        //        if (expected_auth_token == post_data["auth_token"])
-        //        {
-        //            // User is authenticated, store the session
-        //            db.exec(fmt("INSERT INTO session(id, user_id) "
-        //                        "VALUES(%ld, %lld)", sid, user_id), NULL, NULL,
-        //                        NULL);
-        //            authenticated = true;
-        //        }
-        //        else
-        //        {
-        //            resp.set_cookie("sid", fmt("%1%", gen_sid(db)), max_session_age);
-        //        }
-
-        //        return 0;
-        //    }
-
-        //    // Not a login request, check session
-        //    else
-        //    {
-        //        auto stmt = db.prepare_v2(
-        //            fmt("SELECT (strftime('%%s', 'now') - create_time) "
-        //                "as age FROM session WHERE id=%ld", sid), -1, 0);
-        //        long age = (stmt->step() == SQLITE_ROW) ?
-        //                    stmt->column_int(0) : max_session_age;
-        //        if (age < max_session_age) authenticated = true;
-        //    }
-
-        //    if (authenticated)
-        //    {
-        //    }
-        //    else
-        //    {
-        //        resp.set_cookie("sid", fmt("%1%", gen_sid(db)), max_session_age);
-        //    }
-        //}
     }
     catch (const std::exception& ex)
     {
