@@ -153,7 +153,7 @@ private:
     vector<string>      headers;
 };
 
-map<string, string> parse_post(const map<string, string>& env)
+map<string, string> parse_post(const map<string, string>& env, string& oRaw)
 {
     map<string, string> post_data;
 
@@ -161,10 +161,9 @@ map<string, string> parse_post(const map<string, string>& env)
     if (content_len_it != env.end() && !content_len_it->second.empty())
     {
         long content_len = lexical_cast<long>(content_len_it->second);
-        string buf;
-        buf.resize(content_len);
-        long read_len = fread(&buf[0], 1, content_len, stdin);
-        post_data = build_map(buf, "&", "=");
+        oRaw.resize(content_len);
+        long read_len = fread(&oRaw[0], 1, content_len, stdin);
+        post_data = build_map(oRaw, "&", "=");
     }
 
     return post_data;
@@ -179,7 +178,8 @@ int main(int argc, char* argv[], char* envp[])
     {
         // Parse the request's data
         auto env          = parse_env(envp);
-        auto post_data    = parse_post(env);
+        string raw_post;
+        auto post_data    = parse_post(env, raw_post);
         auto query_string = build_map(env["QUERY_STRING"], "&", "=");
         auto cookies      = build_map(env["HTTP_COOKIE"] , ",", "=");
 
@@ -203,6 +203,7 @@ int main(int argc, char* argv[], char* envp[])
         resp.data["p1"]     = query_string["p1"];
         resp.data["p2"]     = query_string["p2"];
         resp.data["step"]   = "1";
+        resp.data["raw_post"] = raw_post;
 	foreach_(const auto& i, post_data)
 	{
 	    resp.data["post_data"] += i.first + ", " + i.second + ", ";

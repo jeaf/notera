@@ -162,7 +162,8 @@
                 $.ajax({
                     url    : apiurl + "?p1=note&p2=" + i,
                     type   : "PUT",
-                    data   : {title: "dechet", content: "rebut"},
+                    data   : "title=dechet&content=rebut",
+                    dataType: "text",
                     success: function(data) {
                         console.log("PUT note: " + JSON.stringify(data))
                     }
