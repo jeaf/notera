@@ -1,45 +1,42 @@
 <html>
     <head>
         <style>
+            #div_loaded {
+                background: #ffffff;
+            }
             #div_logged_in {
-                width      : 750px;
-                margin     : 0 auto;
-                background : #99c;
+                background : #ff0000;
             }
             #div_header {
-                padding:5px 5px;
-                background:#ddd;
+                background:#228b22;
             }
-            #div_nav {
-                padding:5px 5px;
-                background:#c99;
+            #div_col_wrapper2 {
+                    clear:left;
+                    float:left;
+                    width:100%;
+                    overflow:hidden;
+                    background:#ffa7a7; /* column 2 background colour */
             }
-            #div_footer {
-                clear: both;
-                background:#cc9;
-                padding: 5px 5px;
-            }
-            #div_main {
-                background:#9c9;
-                float:right;
-                width:530px;
-                padding: 5px;
+            #div_col_wrapper1 {
+                    float:left;
+                    width:100%;
+                    position:relative;
+                    right:50%;
+                    background:#fff689; /* column 1 background colour */
             }
             #div_sidebar {
-                background:#c9c;
-                float:left;
-                width:200px;
-                padding: 5px;
+                    float:left;
+                    width:46%;
+                    position:relative;
+                    left:52%;
+                    overflow:hidden;
             }
-            #div_nav ul {
-                margin:0;
-                padding:0;
-                list-style:none;
-            }
-            #div_nav li {
-                display:inline;
-                margin:0;
-                padding:0;
+            #div_main {
+                    float:left;
+                    width:46%;
+                    position:relative;
+                    left:56%;
+                    overflow:hidden;
             }
         </style>
     </head>
@@ -60,23 +57,21 @@
                 <div id="div_header">
                     <p>Header</p>
                 </div>
-                <div id="div_nav">
-                    <p>Nav</p>
-                </div>
-                <div id="div_sidebar">
-                    <input type="button" value="New Note" onClick="new_note()" />
-                    <input type="button" value="Reload Notes List" onClick="load_notes_list()" />
-                    <ul id="ul_note_list">
-                    </ul>
-                </div>
-                <div id="div_main">
-                    <textarea id="textarea_note_id"></textarea>
-                    <textarea id="textarea_note_title" rows="1" cols="60"></textarea>
-                    <textarea id="textarea_note_text" rows="6" cols="60"></textarea>
-                    <input type="button" value="Save" onClick="save_note()" />
-                </div>
-                <div id="div_footer">
-                    <p>Footer</p>
+                <div id="div_col_wrapper2">
+                    <div id="div_col_wrapper1">
+                        <div id="div_sidebar">
+                            <input type="button" value="New Note" onClick="new_note()" />
+                            <input type="button" value="Reload Notes List" onClick="load_notes_list()" />
+                            <ul id="ul_note_list">
+                            </ul>
+                        </div>
+                        <div id="div_main">
+                            <textarea id="textarea_note_id"></textarea>
+                            <textarea id="textarea_note_title" rows="1" cols="60"></textarea>
+                            <textarea id="textarea_note_content" rows="6" cols="60"></textarea>
+                            <input type="button" value="Save" onClick="save_note()" />
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -162,7 +157,8 @@
                 $.ajax({
                     url    : apiurl + "?p1=note&p2=" + i,
                     type   : "PUT",
-                    data   : "title=dechet&content=rebut",
+                    data   : {title  : $("#textarea_note_title").val(),
+                              content: $("#textarea_note_content").val()},
                     dataType: "text",
                     success: function(data) {
                         console.log("PUT note: " + JSON.stringify(data))
@@ -206,7 +202,7 @@
                     success: function(data) {
                         console.debug("GET note with id: " + JSON.stringify(data))
                         $("#textarea_note_title").val(data.title)
-                        $("#textarea_note_text").val(data.content)
+                        $("#textarea_note_content").val(data.content)
                     }
                 })
             }
