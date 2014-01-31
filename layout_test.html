@@ -1,0 +1,44 @@
+<html>
+    <head>
+        <style>
+            body {
+                margin: 0;
+            }
+            #div_header {
+                color: white;
+                background: blue;
+                height: 80px;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="div_logged_in">
+            <div id="div_header">
+                <img src="note.png" height="60" width="60" style="position: relative; top:10"></img>
+                <h1 style="display: inline; position: relative; top:-10">notera</h1>
+                <a style="display: inline; position: relative; top:-12px; left:85">home</a>
+                <a style="display: inline; position: relative; top:-12px; left:105">settings</a>
+                <a style="display: inline; position: relative; top:-12px; left:125">help</a>
+                <a style="display: inline; position: relative; top:-12px; left:145">about</a>
+                <p style="display: inline; float:right; position: relative; top:-12px">Logged in as</p>
+            </div>
+            <div id="div_col_wrapper2">
+                <div id="div_col_wrapper1">
+                    <div id="div_sidebar">
+                        <input type="button" value="New Note" onClick="new_note()" />
+                        <input type="button" value="Reload Notes List" onClick="load_notes_list()" />
+                        <ul id="ul_note_list">
+                        </ul>
+                    </div>
+                    <div id="div_main">
+                        <textarea id="textarea_note_id"></textarea>
+                        <textarea id="textarea_note_title" rows="1" cols="60"></textarea>
+                        <textarea id="textarea_note_content" rows="6" cols="60"></textarea>
+                        <input type="button" value="Save" onClick="save_note()" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    </body>
+</html>
+
