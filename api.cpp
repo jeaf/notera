@@ -312,7 +312,8 @@ int main(int argc, char* argv[], char* envp[])
                     auto v = db.get_note_list(ses->user);
                     foreach_(const auto& n, v)
                     {
-			resp.data_list["note_list"].push_back(fmt("%1%", n.id));
+			resp.data_list["note_list"].push_back(
+                            fmt("[%1%, \"%2%\"]", n.id, n.title));
                     }
                 }
 		else

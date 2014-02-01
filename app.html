@@ -45,8 +45,7 @@
                 border: none;
             }
             li:hover {
-                font-size: 25px;
-                background: #f6f6f6;
+                background: #fff7f7;
             }
             #div_main {
                     float:left;
@@ -93,6 +92,7 @@
                             <textarea id="textarea_note_title" rows="1" cols="60"></textarea>
                             <textarea id="textarea_note_content" rows="6" cols="60"></textarea>
                             <input type="button" value="Save" onClick="save_note()" />
+                            <input type="button" value="Delete" onClick="delete_note()" />
                         </div>
                     </div>
                 </div>
@@ -189,6 +189,18 @@
                 })
             }
 
+            function delete_note() {
+                var i = $("#textarea_note_id").val()
+                $.ajax({
+                    url    : apiurl + "?p1=note&p2=" + i,
+                    type   : "DELETE",
+                    dataType: "text",
+                    success: function(data) {
+                        console.log("PUT note: " + data)
+                    }
+                })
+            }
+
             function new_note() {
                 $.ajax({
                     url    : apiurl + "?p1=note",
@@ -208,7 +220,11 @@
                         console.debug("GET note: " + JSON.stringify(data))
                         items = []
                         $.each(data.note_list, function(i, obj) {
-                            items.push('<li onclick="show_note(' + obj + ')">' + obj + '</li>')
+                            var display_str = obj[0]
+                            if (obj[1].length > 0) {
+                                display_str = obj[1]
+                            }
+                            items.push('<li onclick="show_note(' + obj[0] + ')">' + display_str + '</li>')
                         })
                         $("#ul_note_list").html(items.join(""))
                     }
