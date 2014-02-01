@@ -4,17 +4,63 @@
             body {
                 margin: 0;
             }
+            a:hover {
+                background: white;
+                color: blue;
+            }
             #div_header {
                 color: white;
                 background: blue;
                 height: 80px;
+            }
+            #div_col_wrapper2 {
+                clear:left;
+                float:left;
+                width:100%;
+                overflow:hidden;
+            }
+            #div_col_wrapper1 {
+                float:left;
+                width:100%;
+                position:relative;
+                right:50%;
+            }
+            #div_sidebar {
+                float:left;
+                width:40%;
+                position:relative;
+                left:50%;
+                overflow:hidden;
+            }
+            ul {
+                list-style-type: none;
+                margin: 0;
+                padding: 0;
+            }
+            li {
+                font: 200 20px/1.5 Helvetica, Verdana, sans-serif;
+                border-bottom: 1px solid #ccc;
+            }
+            li:last-child {
+                border: none;
+            }
+            li:hover {
+                font-size: 25px;
+                background: #f6f6f6;
+            }
+            #div_main {
+                    float:left;
+                    width:58%;
+                    position:relative;
+                    left:50%;
+                    overflow:hidden;
             }
         </style>
     </head>
     <body>
         <div id="div_logged_in">
             <div id="div_header">
-                <img src="note.png" height="60" width="60" style="position: relative; top:10"></img>
+                <img src="note.png" height="60" style="position: relative; top:10"></img>
                 <h1 style="display: inline; position: relative; top:-10">notera</h1>
                 <a style="display: inline; position: relative; top:-12px; left:85">home</a>
                 <a style="display: inline; position: relative; top:-12px; left:105">settings</a>
@@ -25,10 +71,12 @@
             <div id="div_col_wrapper2">
                 <div id="div_col_wrapper1">
                     <div id="div_sidebar">
+                        <ul id="ul_note_list">
+                            <li>Note 1</li>
+                            <li>Note 2</li>
+                        </ul>
                         <input type="button" value="New Note" onClick="new_note()" />
                         <input type="button" value="Reload Notes List" onClick="load_notes_list()" />
-                        <ul id="ul_note_list">
-                        </ul>
                     </div>
                     <div id="div_main">
                         <textarea id="textarea_note_id"></textarea>
