@@ -1,41 +1,58 @@
 <html>
     <head>
         <style>
-            #div_loaded {
-                background: #ffffff;
+            body {
+                margin: 0;
             }
-            #div_logged_in {
-                background : #ff0000;
+            a:hover {
+                background: white;
+                color: blue;
             }
             #div_header {
-                background:#228b22;
+                color: white;
+                background: blue;
+                height: 80px;
             }
             #div_col_wrapper2 {
-                    clear:left;
-                    float:left;
-                    width:100%;
-                    overflow:hidden;
-                    background:#ffa7a7; /* column 2 background colour */
+                clear:left;
+                float:left;
+                width:100%;
+                overflow:hidden;
             }
             #div_col_wrapper1 {
-                    float:left;
-                    width:100%;
-                    position:relative;
-                    right:50%;
-                    background:#fff689; /* column 1 background colour */
+                float:left;
+                width:100%;
+                position:relative;
+                right:50%;
             }
             #div_sidebar {
-                    float:left;
-                    width:46%;
-                    position:relative;
-                    left:52%;
-                    overflow:hidden;
+                float:left;
+                width:40%;
+                position:relative;
+                left:50%;
+                overflow:hidden;
+            }
+            ul {
+                list-style-type: none;
+                margin: 0;
+                padding: 0;
+            }
+            li {
+                font: 200 20px/1.5 Helvetica, Verdana, sans-serif;
+                border-bottom: 1px solid #ccc;
+            }
+            li:last-child {
+                border: none;
+            }
+            li:hover {
+                font-size: 25px;
+                background: #f6f6f6;
             }
             #div_main {
                     float:left;
-                    width:46%;
+                    width:58%;
                     position:relative;
-                    left:56%;
+                    left:50%;
                     overflow:hidden;
             }
         </style>
@@ -55,7 +72,13 @@
             </div>
             <div id="div_logged_in" style="display:none">
                 <div id="div_header">
-                    <p>Header</p>
+                    <img src="note.png" height="60" style="position: relative; top:10"></img>
+                    <h1 style="display: inline; position: relative; top:-10">notera</h1>
+                    <a style="display: inline; position: relative; top:-12px; left:85">home</a>
+                    <a style="display: inline; position: relative; top:-12px; left:105">settings</a>
+                    <a style="display: inline; position: relative; top:-12px; left:125">help</a>
+                    <a style="display: inline; position: relative; top:-12px; left:145">about</a>
+                    <p style="display: inline; float:right; position: relative; top:-12px">Logged in as</p>
                 </div>
                 <div id="div_col_wrapper2">
                     <div id="div_col_wrapper1">
